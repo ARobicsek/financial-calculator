@@ -308,6 +308,7 @@ function runCustomCardSimulation() {
     withdrawalStrategy: state.inputs.withdrawalStrategy,
     allocation: allocation,
     glidePathEnabled: state.inputs.useGlidePath,
+    nearTermCrashProbability: state.inputs.nearTermCrashProbability,
     iterations: 200 // Fewer iterations for interactive speed
   });
 

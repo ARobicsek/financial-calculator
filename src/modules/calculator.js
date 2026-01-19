@@ -12,9 +12,18 @@ export function runCalculation() {
         resultsContainer.innerHTML = `
         <div class="loading-state" id="resultsLoading">
           <div class="spinner"></div>
-          <h3>Running Monte Carlo Simulations...</h3>
+          <h3 style="margin-top: 1.5rem;">Running Monte Carlo Simulations<span id="loadingEllipsis"></span></h3>
         </div>
       `;
+        // Animate ellipsis with JavaScript
+        let dots = 0;
+        const ellipsisEl = document.getElementById('loadingEllipsis');
+        const ellipsisInterval = setInterval(() => {
+            dots = (dots + 1) % 4;
+            if (ellipsisEl) ellipsisEl.textContent = '.'.repeat(dots);
+        }, 400);
+        // Store interval to clear later
+        window._ellipsisInterval = ellipsisInterval;
     }
 
     // Scrape inputs from the dashboard before calculating
@@ -23,6 +32,8 @@ export function runCalculation() {
     // Allow UI to update
     setTimeout(() => {
         performCalculation();
+        // Clear ellipsis animation
+        if (window._ellipsisInterval) clearInterval(window._ellipsisInterval);
         updateResultsView(runRecalculation);
     }, 100);
 }
@@ -85,6 +96,7 @@ function scrapeDashboardInputs() {
     state.inputs.jobStability = document.getElementById('jobStability')?.value || 'stable';
     state.inputs.withdrawalStrategy = document.getElementById('withdrawalStrategy')?.value || 'guardrails';
     state.inputs.useGlidePath = document.getElementById('useGlidePath')?.checked ?? true;
+    state.inputs.nearTermCrashProbability = parseInt(document.getElementById('nearTermCrashProbability')?.value) || 20;
 }
 
 function performCalculation() {
@@ -131,7 +143,8 @@ function performCalculation() {
         withdrawalStrategy: state.inputs.withdrawalStrategy,
         allocation: allocationResult.allocation,
         glidePathEnabled: state.inputs.useGlidePath,
-        housingParams: housingParams
+        housingParams: housingParams,
+        nearTermCrashProbability: state.inputs.nearTermCrashProbability
     });
 
     // Define allocation strategies
@@ -209,14 +222,48 @@ function performCalculation() {
 
     const strategyResults = allocationStrategies.map(strategy => {
         // If user has allocated to housing, apply it to ALL strategies
-        // Add the housing allocation to each strategy's allocation
         let strategyAllocation = { ...strategy.allocation };
         if (homeAllocation > 0 && !strategy.isUserAllocation) {
-            // Only add housing to non-user allocations (user allocation already has it)
-            // Calculate the home allocation percentage as decimal
+            // For non-user strategies: fund home from cash first, then bonds
+            // This is more realistic than pro-rata drawing from all assets
             const homeAllocPct = homeAllocation / 100;
+            let toDeduct = homeAllocPct;
 
-            // Add residential real estate to the allocation
+            // Draw from cash first
+            const cashAvailable = strategyAllocation.cashMoneyMarket || 0;
+            const cashDeduction = Math.min(cashAvailable, toDeduct);
+            strategyAllocation.cashMoneyMarket = cashAvailable - cashDeduction;
+            toDeduct -= cashDeduction;
+
+            // Then draw from bonds if needed
+            if (toDeduct > 0) {
+                const bondsAvailable = strategyAllocation.usAggregateBonds || 0;
+                const bondDeduction = Math.min(bondsAvailable, toDeduct);
+                strategyAllocation.usAggregateBonds = bondsAvailable - bondDeduction;
+                toDeduct -= bondDeduction;
+            }
+
+            // Then from TIPS if still needed
+            if (toDeduct > 0) {
+                const tipsAvailable = strategyAllocation.tips || 0;
+                const tipsDeduction = Math.min(tipsAvailable, toDeduct);
+                strategyAllocation.tips = tipsAvailable - tipsDeduction;
+                toDeduct -= tipsDeduction;
+            }
+
+            // Finally from equities if necessary (large home allocation)
+            if (toDeduct > 0) {
+                const equityKeys = ['usLargeCap', 'usSmallCap', 'intlDeveloped', 'emergingMarkets'];
+                for (const key of equityKeys) {
+                    if (toDeduct <= 0) break;
+                    const available = strategyAllocation[key] || 0;
+                    const deduction = Math.min(available, toDeduct);
+                    strategyAllocation[key] = available - deduction;
+                    toDeduct -= deduction;
+                }
+            }
+
+            // Add home to allocation
             strategyAllocation.residentialRealEstate = homeAllocPct;
         }
 
@@ -231,13 +278,15 @@ function performCalculation() {
             withdrawalStrategy: state.inputs.withdrawalStrategy,
             allocation: strategyAllocation,
             glidePathEnabled: state.inputs.useGlidePath,
-            housingParams: housingParams,  // Pass housing params if user has home allocation
+            housingParams: housingParams,
+            nearTermCrashProbability: state.inputs.nearTermCrashProbability,
             iterations: 500
         });
 
         return {
             ...strategy,
             allocation: strategyAllocation,  // Store the updated allocation with home
+            originalAllocation: strategy.allocation, // Store original allocation (before home drawn from cash/bonds)
             successRate: result.successRate,
             medianPortfolio: result.portfolioAtRetirement.p50,
             stats: calculatePortfolioStats(strategyAllocation)

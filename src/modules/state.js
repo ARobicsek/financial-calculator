@@ -17,7 +17,7 @@ export const state = {
     inputs: {
         // Basic Info
         age: 52,
-        currentSavings: 11200000,
+        currentSavings: 11100000,
         windfall: 0,
         monthlyContribution: 2000,
         // Goals
@@ -35,15 +35,16 @@ export const state = {
         jobStability: 'stable',
         useGlidePath: true,
         withdrawalStrategy: 'guardrails',
+        nearTermCrashProbability: 20, // 0-60%, probability of 20%+ drawdown in next 3 years
         // Current Portfolio Allocation
         currentAllocation: {
-            usLargeCap: 24,
+            usLargeCap: 22,
             usSmallMidCap: 4,
             intlDeveloped: 10,
-            emergingMarkets: 2,
-            usBonds: 24,
+            emergingMarkets: 1,
+            usBonds: 23,
             tips: 0,
-            cashMoneyMarket: 36,
+            cashMoneyMarket: 40,
             residentialRealEstate: 0  // Home purchase as allocation %
         },
         useCurrentAllocation: true,

@@ -97,7 +97,9 @@ function runSingleSimulation(params) {
         glidePathEnabled,
         inflationRate,
         // Housing params (optional)
-        housingParams = null
+        housingParams = null,
+        // Near-term crash probability (0-60%)
+        nearTermCrashProbability = 20
     } = params;
 
     const { expectedReturns, volatility } = MARKET_DATA;
@@ -136,6 +138,17 @@ function runSingleSimulation(params) {
     let currentWithdrawal = annualWithdrawal;
     let lastYearReturn = 0;
     let minWithdrawalRatio = 1;
+
+    // Near-term crash injection logic
+    // Decide if this simulation experiences an early crash based on user probability
+    const crashWindow = 36; // 3 years in months
+    const crashProbDecimal = nearTermCrashProbability / 100;
+    const hasCrash = Math.random() < crashProbDecimal;
+    // If crash occurs, it will be a ~25% drawdown spread over 6-18 months
+    const crashMagnitude = 0.25; // 25% total drawdown
+    const crashDuration = 6 + Math.floor(Math.random() * 12); // 6-18 months
+    const crashStartMonth = 1 + Math.floor(Math.random() * (crashWindow - crashDuration)); // Random start within crash window
+    const monthlyDrawdown = crashMagnitude / crashDuration;
 
     const trajectory = [{
         age: currentAge,
@@ -178,7 +191,19 @@ function runSingleSimulation(params) {
         }
 
         // Generate monthly return for liquid portfolio
-        const monthlyReturn = generatePortfolioReturn(currentAllocation, expectedReturns, volatility);
+        let monthlyReturn = generatePortfolioReturn(currentAllocation, expectedReturns, volatility);
+
+        // Apply crash injection if this simulation has a crash and we're in the crash window
+        if (hasCrash && month >= crashStartMonth && month < crashStartMonth + crashDuration) {
+            // Apply negative shock to equities portion of portfolio
+            const equityWeight = (currentAllocation.usLargeCap || 0) +
+                (currentAllocation.usSmallCap || 0) +
+                (currentAllocation.intlDeveloped || 0) +
+                (currentAllocation.emergingMarkets || 0);
+            // Scale the drawdown by equity weight (cash/bonds less affected)
+            monthlyReturn -= monthlyDrawdown * equityWeight;
+        }
+
         portfolio *= (1 + monthlyReturn);
 
         // Handle home appreciation if still owned
@@ -371,7 +396,8 @@ export function runMonteCarloSimulation(params, iterations = 1000) {
         withdrawalStrategy = 'guardrails', // 'fixed' or 'guardrails'
         allocation = {},
         glidePathEnabled = true,
-        housingParams = null  // Optional: { holdingPeriodYears, monthlyRent, monthlyOwnershipCosts }
+        housingParams = null,  // Optional: { holdingPeriodYears, monthlyRent, monthlyOwnershipCosts }
+        nearTermCrashProbability = 20 // 0-60%, probability of 20%+ crash in next 3 years
     } = params;
 
     const initialPortfolio = currentSavings + windfall;
@@ -398,7 +424,8 @@ export function runMonteCarloSimulation(params, iterations = 1000) {
         allocation: normalizeAllocation(allocation),
         glidePathEnabled,
         inflationRate,
-        housingParams  // Pass housing params for home ownership mechanics
+        housingParams,
+        nearTermCrashProbability // Pass to individual simulations
     };
 
     // Run simulations

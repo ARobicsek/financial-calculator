@@ -83,7 +83,6 @@ export function updateResultsView(recalculateCallback) {
     
     ${renderStrategyComparison()}
     ${renderHousingComparison()}
-    ${renderFundTable()}
     ${renderAssumptionsUsed()}
   `;
 
@@ -171,7 +170,8 @@ export function selectStrategy(strategyName, customAllocation = null) {
     withdrawalStrategy: state.inputs.withdrawalStrategy,
     allocation: allocation,
     glidePathEnabled: state.inputs.useGlidePath,
-    housingParams: housingParams,  // Include housing params!
+    housingParams: housingParams,
+    nearTermCrashProbability: state.inputs.nearTermCrashProbability,
     iterations: 500
   });
 
@@ -440,22 +440,6 @@ export function updateHousingComparison(strategyName, allocation) {
     return;
   }
 
-  // Create allocation WITHOUT home (redistribute proportionally)
-  const allocationWithoutHome = { ...allocation };
-  if (hasHome) {
-    const homeValue = allocationWithoutHome.residentialRealEstate;
-    delete allocationWithoutHome.residentialRealEstate;
-
-    // Redistribute home allocation proportionally to other assets
-    const remainingTotal = Object.values(allocationWithoutHome).reduce((s, v) => s + v, 0);
-    if (remainingTotal > 0) {
-      const scale = (remainingTotal + homeValue) / remainingTotal;
-      for (const key of Object.keys(allocationWithoutHome)) {
-        allocationWithoutHome[key] *= scale;
-      }
-    }
-  }
-
   // Use the pre-computed strategy result for WITH home (BUY scenario)
   const withHomeResult = {
     successRate: selectedStrategy.successRate,
@@ -464,7 +448,11 @@ export function updateHousingComparison(strategyName, allocation) {
     }
   };
 
-  // Run simulation WITHOUT home (RENT scenario) - only run this one
+  // For RENT scenario: use the ORIGINAL strategy allocation (before home was drawn from cash/bonds)
+  // This ensures rent scenario matches what you'd get if you never added home allocation
+  const allocationWithoutHome = selectedStrategy.originalAllocation || allocation;
+
+  // Run simulation WITHOUT home (RENT scenario)
   const withoutHomeResult = runMonteCarloSimulation({
     currentAge: state.inputs.age,
     retirementAge: state.inputs.retirementAge,
@@ -476,6 +464,7 @@ export function updateHousingComparison(strategyName, allocation) {
     withdrawalStrategy: state.inputs.withdrawalStrategy,
     allocation: allocationWithoutHome,
     glidePathEnabled: state.inputs.useGlidePath,
+    nearTermCrashProbability: state.inputs.nearTermCrashProbability,
     housingParams: null, // No home
     iterations: 500  // Match the strategy comparison iterations
   });

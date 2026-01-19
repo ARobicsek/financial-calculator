@@ -59,10 +59,6 @@ function renderInlineTabContent(tabId) {
             <input type="number" class="form-input" id="inlineCurrentSavings" value="${state.inputs.currentSavings}" min="0">
           </div>
           <div class="form-group">
-            <label class="form-label">Windfall (inheritance, etc.)</label>
-            <input type="number" class="form-input" id="inlineWindfall" value="${state.inputs.windfall}" min="0">
-          </div>
-          <div class="form-group">
             <label class="form-label">Monthly Contribution ($)</label>
             <input type="number" class="form-input" id="inlineMonthlyContribution" value="${state.inputs.monthlyContribution}" min="0">
           </div>
@@ -299,9 +295,6 @@ export function saveCurrentTabInputs() {
 
   const currentSavings = document.getElementById('inlineCurrentSavings');
   if (currentSavings) state.inputs.currentSavings = parseFloat(currentSavings.value) || state.inputs.currentSavings;
-
-  const windfall = document.getElementById('inlineWindfall');
-  if (windfall) state.inputs.windfall = parseFloat(windfall.value) || 0;
 
   const monthlyContribution = document.getElementById('inlineMonthlyContribution');
   if (monthlyContribution) state.inputs.monthlyContribution = parseFloat(monthlyContribution.value) || 0;

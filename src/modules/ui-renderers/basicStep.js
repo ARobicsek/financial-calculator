@@ -1,7 +1,7 @@
 import { state } from '../state.js';
 
 export function renderBasicStep() {
-    return `
+  return `
     <div class="form-grid">
       <div class="form-group">
         <label class="form-label">Current Age</label>
@@ -15,14 +15,7 @@ export function renderBasicStep() {
         </div>
         <span class="form-hint">Total across all accounts (401k, IRA, taxable)</span>
       </div>
-      <div class="form-group">
-        <label class="form-label">Cash Windfall / Additional Investment</label>
-        <div class="input-with-prefix">
-          <span class="input-prefix">$</span>
-          <input type="number" class="form-input" id="windfall" value="${state.inputs.windfall}" min="0" step="1000">
-        </div>
-        <span class="form-hint">House sale proceeds, inheritance, bonus, etc.</span>
-      </div>
+
       <div class="form-group">
         <label class="form-label">Monthly Contribution</label>
         <div class="input-with-prefix">

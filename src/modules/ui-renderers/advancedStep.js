@@ -1,7 +1,7 @@
 import { state } from '../state.js';
 
 export function renderAdvancedStep() {
-    return `
+  return `
     <div class="form-grid">
       <div class="form-group">
         <label class="form-label">Tax Filing Status</label>
@@ -34,6 +34,17 @@ export function renderAdvancedStep() {
           Use Glide Path (gradually reduce equities)
         </label>
         <span class="form-hint">Reduces equity allocation by ~1.5% per year approaching retirement</span>
+      </div>
+      <div class="form-group full-width">
+        <label class="form-label">Near-Term Crash Probability: <span id="crashProbValue">${state.inputs.nearTermCrashProbability}%</span></label>
+        <input type="range" class="form-slider" id="nearTermCrashProbability" 
+               value="${state.inputs.nearTermCrashProbability}" min="0" max="60" step="5">
+        <div class="slider-labels">
+          <span>0%</span>
+          <span>20% (base)</span>
+          <span>60%</span>
+        </div>
+        <span class="form-hint">Probability of a 20%+ equity drawdown in the next 3 years. Higher = more stress testing.</span>
       </div>
     </div>
   `;

@@ -1084,8 +1084,8 @@ body {
 }
 
 .strategy-card.user-allocation {
-  border-color: var(--color-accent);
-  background: rgba(212, 169, 66, 0.05);
+  border-color: var(--color-border-light);
+  background: rgba(212, 169, 66, 0.03);
 }
 
 .strategy-card.selected {
@@ -2252,4 +2252,32 @@ body {
 
 .housing-hint strong {
   color: var(--color-accent);
+}
+
+/* Animated loading ellipsis - uses clip-path since content can't be animated */
+.loading-ellipsis::after {
+  content: '...';
+  display: inline-block;
+  width: 1.5em;
+  text-align: left;
+  animation: ellipsis-clip 1.5s steps(4, end) infinite;
+}
+
+@keyframes ellipsis-clip {
+  0% {
+    clip-path: inset(0 100% 0 0);
+  }
+
+  25% {
+    clip-path: inset(0 66% 0 0);
+  }
+
+  50% {
+    clip-path: inset(0 33% 0 0);
+  }
+
+  75%,
+  100% {
+    clip-path: inset(0 0 0 0);
+  }
 }

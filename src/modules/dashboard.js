@@ -78,6 +78,15 @@ function attachDashboardListeners() {
     });
   }
 
+  // Near-Term Crash Probability slider
+  const crashProbSlider = document.getElementById('nearTermCrashProbability');
+  if (crashProbSlider) {
+    crashProbSlider.addEventListener('input', (e) => {
+      const valSpan = document.getElementById('crashProbValue');
+      if (valSpan) valSpan.textContent = `${e.target.value}%`;
+    });
+  }
+
   // Portfolio Sliders - update display on input, re-render on change (release)
   document.querySelectorAll('.allocation-slider').forEach(slider => {
     // Update display value in real-time as user drags
