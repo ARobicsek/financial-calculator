@@ -147,10 +147,21 @@ export function setupMethodsNavigation() {
 
   // Logo click - return to main page
   const logo = document.querySelector('.logo');
+  const logoH1 = document.querySelector('.logo h1');
+
   if (logo) {
     logo.style.cursor = 'pointer';
     logo.addEventListener('click', (e) => {
       e.preventDefault();
+      hideMethodsPage();
+    });
+  }
+
+  if (logoH1) {
+    logoH1.style.cursor = 'pointer';
+    logoH1.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       hideMethodsPage();
     });
   }
