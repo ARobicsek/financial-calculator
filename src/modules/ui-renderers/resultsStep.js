@@ -12,8 +12,13 @@ export function updateResultsView(recalculateCallback) {
   const container = document.getElementById('resultsContainer');
   if (!container) return; // Should not happen in dashboard mode
 
-  const { monte, allocation, riskProfile, portfolioStats } = state.results;
-  const successPercent = (monte.successRate * 100).toFixed(0);
+  const { monte, allocation, riskProfile, portfolioStats, strategyComparison } = state.results;
+
+  // Use Risk-Matched strategy's success rate for consistency with the card below
+  const riskMatchedStrategy = strategyComparison?.find(s => s.name === 'Risk-Matched');
+  const successPercent = riskMatchedStrategy
+    ? (riskMatchedStrategy.successRate * 100).toFixed(0)
+    : (monte.successRate * 100).toFixed(0);
   const equityPercent = (allocation.equityPercentage * 100).toFixed(0);
 
   container.innerHTML = `
