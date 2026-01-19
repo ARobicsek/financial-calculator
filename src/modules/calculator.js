@@ -2,37 +2,79 @@ import { state } from './state.js';
 import { runMonteCarloSimulation } from '../engine/monteCarlo.js';
 import { calculateAllocation, calculatePortfolioStats } from '../engine/assetAllocation.js';
 import { calculateRiskProfile } from '../components/RiskQuestionnaire.js';
-import { renderResults } from './ui-renderers/resultsStep.js';
+import { updateResultsView } from './ui-renderers/resultsStep.js';
 
 export function runCalculation() {
-    const container = document.getElementById('wizardContainer');
-    container.innerHTML = `
-    <div class="loading-state">
-      <div class="spinner"></div>
-      <h3>Running Monte Carlo Simulations...</h3>
-      <p>Projecting 1,000 potential market scenarios based on your inputs.</p>
-    </div>
-  `;
-    document.getElementById('progressContainer').classList.add('hidden');
+    const customLoading = document.getElementById('resultsLoading');
+    if (!customLoading) {
+        // Create a temporary loading overlay or text in results
+        const resultsContainer = document.getElementById('resultsContainer');
+        resultsContainer.innerHTML = `
+        <div class="loading-state" id="resultsLoading">
+          <div class="spinner"></div>
+          <h3>Running Monte Carlo Simulations...</h3>
+        </div>
+      `;
+    }
+
+    // Scrape inputs from the dashboard before calculating
+    scrapeDashboardInputs();
 
     // Allow UI to update
     setTimeout(() => {
         performCalculation();
-        renderResults(runRecalculation);
+        updateResultsView(runRecalculation);
     }, 100);
 }
 
 export function runRecalculation() {
-    // Recalculate risk profile from updated answers (in case they changed in inline editor)
-    const riskProfile = calculateRiskProfile(state.inputs.riskAnswers);
-    // Important: Update state risk profile before calculation uses it?
-    // Actually calculateAllocation takes score.
-    // We should update state.results? Or just use local variable?
-    // The original code updated state.results later.
-    // But calculateAllocation needs the score.
-
+    // Used by inline editor or re-calc interaction
+    scrapeDashboardInputs();
     performCalculation();
-    renderResults(runRecalculation);
+    updateResultsView(runRecalculation);
+}
+
+function scrapeDashboardInputs() {
+    // Basic
+    state.inputs.age = parseInt(document.getElementById('age')?.value) || 52;
+    state.inputs.currentSavings = parseFloat(document.getElementById('currentSavings')?.value) || 0;
+    state.inputs.windfall = parseFloat(document.getElementById('windfall')?.value) || 0;
+    state.inputs.monthlyContribution = parseFloat(document.getElementById('monthlyContribution')?.value) || 0;
+
+    // Portfolio
+    state.inputs.useCurrentAllocation = document.getElementById('useCurrentAllocation')?.checked ?? false;
+    // Sliders
+    const allocKeys = ['usLargeCap', 'usSmallMidCap', 'intlDeveloped', 'emergingMarkets', 'usBonds', 'tips', 'cashMoneyMarket'];
+    allocKeys.forEach(key => {
+        const slider = document.getElementById(`${key}Slider`);
+        if (slider) state.inputs.currentAllocation[key] = parseInt(slider.value) || 0;
+    });
+
+    // Goals
+    state.inputs.retirementAge = parseInt(document.getElementById('retirementAge')?.value) || 65;
+    state.inputs.desiredIncome = parseFloat(document.getElementById('desiredIncome')?.value) || 60000;
+    state.inputs.endAge = parseInt(document.getElementById('endAge')?.value) || 95;
+
+    // Risk - handled by existing click listeners updating state? 
+    // In dashboard.js I only did UI class toggle. Need to scrape or update state there.
+    // Let's scrape:
+    document.querySelectorAll('.question-card').forEach((card, idx) => {
+        const selected = card.querySelector('.option-btn.selected');
+        if (selected) {
+            state.inputs.riskAnswers[idx] = parseInt(selected.dataset.value);
+        }
+    });
+
+    // Income
+    state.inputs.socialSecurityAge = parseInt(document.getElementById('socialSecurityAge')?.value) || 67;
+    state.inputs.socialSecurityMonthly = parseFloat(document.getElementById('socialSecurityMonthly')?.value) || 0;
+    state.inputs.otherGuaranteedIncome = parseFloat(document.getElementById('otherGuaranteedIncome')?.value) || 0;
+
+    // Advanced
+    state.inputs.filingStatus = document.getElementById('filingStatus')?.value || 'married';
+    state.inputs.jobStability = document.getElementById('jobStability')?.value || 'stable';
+    state.inputs.withdrawalStrategy = document.getElementById('withdrawalStrategy')?.value || 'guardrails';
+    state.inputs.useGlidePath = document.getElementById('useGlidePath')?.checked ?? true;
 }
 
 function performCalculation() {
@@ -115,7 +157,6 @@ function performCalculation() {
         }
     ];
 
-    // Add user's current allocation if enabled
     if (state.inputs.useCurrentAllocation) {
         const userAlloc = state.inputs.currentAllocation;
         allocationStrategies.push({
@@ -135,7 +176,6 @@ function performCalculation() {
         });
     }
 
-    // Run simulations for each strategy
     const strategyResults = allocationStrategies.map(strategy => {
         const result = runMonteCarloSimulation({
             currentAge: state.inputs.age,
@@ -159,7 +199,6 @@ function performCalculation() {
         };
     });
 
-    // Update state with new results
     state.results = {
         monte: mcResults,
         allocation: allocationResult,

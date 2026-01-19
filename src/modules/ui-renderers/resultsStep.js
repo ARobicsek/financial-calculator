@@ -1,27 +1,25 @@
 import { state } from '../state.js';
-import { renderInlineEditor, attachInlineEditorListeners } from './inlineEditor.js';
+// import { renderInlineEditor, attachInlineEditorListeners } from './inlineEditor.js'; // Disabling inline editor in dashboard mode
 import { renderStrategyComparison, attachCustomCardListeners } from './strategyComparison.js';
-import { renderCurrentStep } from '../navigation.js';
 import { formatNumber, formatRiskProfile } from '../utils/formatting.js';
 import { showMethodology } from './sidebar.js';
 import { FUND_RECOMMENDATIONS } from '../../data/marketData.js';
 import { Chart } from 'chart.js';
 
-export function renderResults(recalculateCallback) {
-    document.getElementById('progressContainer').classList.add('hidden');
-    document.getElementById('wizardContainer').classList.add('hidden');
-    document.getElementById('resultsContainer').classList.remove('hidden');
+export function updateResultsView(recalculateCallback) {
+  // In Dashboard mode, we target the #resultsContainer directly.
+  // We no longer need to hide wizard/show results.
+  const container = document.getElementById('resultsContainer');
+  if (!container) return; // Should not happen in dashboard mode
 
-    const { monte, allocation, riskProfile, portfolioStats } = state.results;
-    const successPercent = (monte.successRate * 100).toFixed(0);
-    const equityPercent = (allocation.equityPercentage * 100).toFixed(0);
+  const { monte, allocation, riskProfile, portfolioStats } = state.results;
+  const successPercent = (monte.successRate * 100).toFixed(0);
+  const equityPercent = (allocation.equityPercentage * 100).toFixed(0);
 
-    document.getElementById('resultsContainer').innerHTML = `
+  container.innerHTML = `
     <div class="results-header">
-      <h2>Your Retirement Analysis</h2>
+      <h2>Your Projections</h2>
     </div>
-    
-    ${renderInlineEditor()}
     
     <div class="primary-result">
       <div class="funded-age">
@@ -61,9 +59,9 @@ export function renderResults(recalculateCallback) {
       <div class="chart-header">
         <h3>Portfolio Projection</h3>
         <div class="chart-legend">
-          <div class="legend-item"><span class="legend-color" style="background: rgba(34, 197, 94, 0.3);"></span> 25th-75th percentile</div>
-          <div class="legend-item"><span class="legend-color" style="background: rgba(212, 169, 66, 1);"></span> Median (50th)</div>
-          <div class="legend-item"><span class="legend-color" style="background: rgba(239, 68, 68, 0.3);"></span> 10th-90th percentile</div>
+          <div class="legend-item"><span class="legend-color" style="background: rgba(34, 197, 94, 0.3);"></span> 25-75th</div>
+          <div class="legend-item"><span class="legend-color" style="background: rgba(212, 169, 66, 1);"></span> Median</div>
+          <div class="legend-item"><span class="legend-color" style="background: rgba(239, 68, 68, 0.3);"></span> 10-90th</div>
         </div>
       </div>
       <div class="chart-wrapper">
@@ -75,140 +73,127 @@ export function renderResults(recalculateCallback) {
     ${renderRecommendations()}
     ${renderFundTable()}
     ${renderAssumptionsUsed()}
-    
-    <div class="btn-group" style="justify-content: center; margin-top: 2rem;">
-      <button class="btn btn-secondary" id="startOverBtn">← Modify Inputs</button>
-    </div>
   `;
 
-    renderFanChart();
-    attachInlineEditorListeners(recalculateCallback);
-    attachCustomCardListeners();
+  renderFanChart();
+  attachCustomCardListeners();
 
-    document.getElementById('startOverBtn')?.addEventListener('click', () => {
-        state.currentStep = 0;
-        document.getElementById('progressContainer').classList.remove('hidden');
-        document.getElementById('wizardContainer').classList.remove('hidden');
-        document.getElementById('resultsContainer').classList.add('hidden');
-        renderCurrentStep();
-    });
-
-    // Attach methodology link listener
-    document.getElementById('methodologyLink')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        showMethodology();
-    });
+  // Attach methodology link listener
+  document.getElementById('methodologyLink')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    showMethodology();
+  });
 }
 
 function renderFanChart() {
-    const { trajectoryByAge } = state.results.monte;
-    const ages = Object.keys(trajectoryByAge).map(Number);
+  const { trajectoryByAge } = state.results.monte;
+  const ages = Object.keys(trajectoryByAge).map(Number);
 
-    const ctx = document.getElementById('fanChart').getContext('2d');
+  const ctx = document.getElementById('fanChart').getContext('2d');
 
-    if (state.fanChart) state.fanChart.destroy();
+  if (state.fanChart) state.fanChart.destroy();
 
-    state.fanChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: ages,
-            datasets: [
-                {
-                    label: '10th Percentile',
-                    data: ages.map(age => trajectoryByAge[age].p10),
-                    borderColor: 'transparent',
-                    backgroundColor: 'transparent',
-                    fill: false,
-                    pointRadius: 0
-                },
-                {
-                    label: '25th Percentile',
-                    data: ages.map(age => trajectoryByAge[age].p25),
-                    borderColor: 'transparent',
-                    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                    fill: '-1',
-                    pointRadius: 0
-                },
-                {
-                    label: '75th Percentile',
-                    data: ages.map(age => trajectoryByAge[age].p75),
-                    borderColor: 'transparent',
-                    backgroundColor: 'rgba(34, 197, 94, 0.25)',
-                    fill: '-1',
-                    pointRadius: 0
-                },
-                {
-                    label: '90th Percentile',
-                    data: ages.map(age => trajectoryByAge[age].p90),
-                    borderColor: 'transparent',
-                    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                    fill: '-1',
-                    pointRadius: 0
-                },
-                {
-                    label: 'Median (50th)',
-                    data: ages.map(age => trajectoryByAge[age].p50),
-                    borderColor: '#d4a942',
-                    backgroundColor: 'transparent',
-                    borderWidth: 3,
-                    pointRadius: 0,
-                    fill: false
-                }
-            ]
+  state.fanChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: ages,
+      datasets: [
+        {
+          label: '10th Percentile',
+          data: ages.map(age => trajectoryByAge[age].p10),
+          borderColor: 'transparent',
+          backgroundColor: 'transparent',
+          fill: false,
+          pointRadius: 0
         },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: { intersect: false, mode: 'index' },
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: (ctx) => `${ctx.dataset.label}: $${formatNumber(ctx.raw)}`
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    title: { display: true, text: 'Age', color: '#9ca3af' },
-                    ticks: { color: '#9ca3af' },
-                    grid: { color: 'rgba(255,255,255,0.05)' }
-                },
-                y: {
-                    title: { display: true, text: 'Portfolio Value', color: '#9ca3af' },
-                    ticks: { color: '#9ca3af', callback: v => '$' + formatNumber(v) },
-                    grid: { color: 'rgba(255,255,255,0.05)' }
-                }
-            }
+        {
+          label: '25th Percentile',
+          data: ages.map(age => trajectoryByAge[age].p25),
+          borderColor: 'transparent',
+          backgroundColor: 'rgba(239, 68, 68, 0.15)',
+          fill: '-1',
+          pointRadius: 0
+        },
+        {
+          label: '75th Percentile',
+          data: ages.map(age => trajectoryByAge[age].p75),
+          borderColor: 'transparent',
+          backgroundColor: 'rgba(34, 197, 94, 0.25)',
+          fill: '-1',
+          pointRadius: 0
+        },
+        {
+          label: '90th Percentile',
+          data: ages.map(age => trajectoryByAge[age].p90),
+          borderColor: 'transparent',
+          backgroundColor: 'rgba(239, 68, 68, 0.15)',
+          fill: '-1',
+          pointRadius: 0
+        },
+        {
+          label: 'Median (50th)',
+          data: ages.map(age => trajectoryByAge[age].p50),
+          borderColor: '#d4a942',
+          backgroundColor: 'transparent',
+          borderWidth: 3,
+          pointRadius: 0,
+          fill: false
         }
-    });
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.dataset.label}: $${formatNumber(ctx.raw)}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          title: { display: true, text: 'Age', color: '#9ca3af' },
+          ticks: { color: '#9ca3af' },
+          grid: { color: 'rgba(255,255,255,0.05)' }
+        },
+        y: {
+          title: { display: true, text: 'Portfolio Value', color: '#9ca3af' },
+          ticks: { color: '#9ca3af', callback: v => '$' + formatNumber(v) },
+          grid: { color: 'rgba(255,255,255,0.05)' }
+        }
+      }
+    }
+  });
 }
 
 function renderRecommendations() {
-    const { monte, allocation } = state.results;
-    const recommendations = [];
+  const { monte, allocation } = state.results;
+  const recommendations = [];
 
-    if (monte.successRate < 0.80) {
-        recommendations.push({
-            icon: '⚠️',
-            title: 'Consider Adjustments',
-            text: `Your success rate is ${(monte.successRate * 100).toFixed(0)}%. Consider increasing savings, delaying retirement, or reducing desired income.`
-        });
-    }
-
+  if (monte.successRate < 0.80) {
     recommendations.push({
-        icon: '📈',
-        title: `${(allocation.equityPercentage * 100).toFixed(0)}/${(100 - allocation.equityPercentage * 100).toFixed(0)} Stock/Bond Split`,
-        text: `Based on your risk profile and time horizon. International stocks (${(allocation.allocation.intlDeveloped * 100).toFixed(0)}%) offer valuation advantage over US equities.`
+      icon: '⚠️',
+      title: 'Consider Adjustments',
+      text: `Your success rate is ${(monte.successRate * 100).toFixed(0)}%. Consider increasing savings, delaying retirement, or reducing desired income.`
     });
+  }
 
-    recommendations.push({
-        icon: '🔄',
-        title: 'Consider Roth Conversions',
-        text: 'Fill the 22% tax bracket before retirement to reduce future RMD tax burden. Review with a tax professional.'
-    });
+  recommendations.push({
+    icon: '📈',
+    title: `${(allocation.equityPercentage * 100).toFixed(0)}/${(100 - allocation.equityPercentage * 100).toFixed(0)} Stock/Bond Split`,
+    text: `Based on your risk profile and time horizon. International stocks (${(allocation.allocation.intlDeveloped * 100).toFixed(0)}%) offer valuation advantage over US equities.`
+  });
 
-    return `
+  recommendations.push({
+    icon: '🔄',
+    title: 'Consider Roth Conversions',
+    text: 'Fill the 22% tax bracket before retirement to reduce future RMD tax burden. Review with a tax professional.'
+  });
+
+  return `
     <div class="recommendations-section">
       <h3>Recommendations</h3>
       ${recommendations.map(r => `
@@ -225,7 +210,7 @@ function renderRecommendations() {
 }
 
 function renderFundTable() {
-    return `
+  return `
     <div class="chart-container">
       <h3 style="margin-bottom: 1rem;">Recommended Low-Cost Funds</h3>
       <table class="fund-table">
@@ -253,7 +238,7 @@ function renderFundTable() {
 }
 
 function renderAssumptionsUsed() {
-    return `
+  return `
     <div class="chart-container" style="background: rgba(212, 169, 66, 0.05); border-color: rgba(212, 169, 66, 0.3);">
       <h3 style="margin-bottom: 1rem; color: var(--color-accent);">📋 Assumptions Used</h3>
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; font-size: 0.875rem;">
