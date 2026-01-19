@@ -14,34 +14,38 @@ export function updateResultsView(recalculateCallback) {
 
   const { monte, allocation, riskProfile, portfolioStats, strategyComparison } = state.results;
 
-  // Use Risk-Matched strategy's success rate for consistency with the card below
-  const riskMatchedStrategy = strategyComparison?.find(s => s.name === 'Risk-Matched');
-  const successPercent = riskMatchedStrategy
-    ? (riskMatchedStrategy.successRate * 100).toFixed(0)
+  // Get selected strategy or default to Risk-Matched
+  const selectedStrategyName = state.selectedStrategy || 'Risk-Matched';
+  const selectedStrategy = strategyComparison?.find(s => s.name === selectedStrategyName) || riskMatchedStrategy;
+
+  const successPercent = selectedStrategy
+    ? (selectedStrategy.successRate * 100).toFixed(0)
     : (monte.successRate * 100).toFixed(0);
-  const equityPercent = (allocation.equityPercentage * 100).toFixed(0);
+  const selectedStats = selectedStrategy?.stats || portfolioStats;
 
   container.innerHTML = `
     <div class="results-header">
       <h2>Your Projections</h2>
     </div>
     
-    <div class="primary-result" title="Based on the Risk-Matched allocation calculated from your risk questionnaire answers. This represents the success rate across 1,000 Monte Carlo simulations using your personalized asset allocation.">
+    <div class="primary-result">
       <div class="funded-age">
         <div class="label">Your plan is funded through age</div>
         <div class="age">${monte.fundedThroughAge}</div>
         <div class="success-rate">
           <span class="percent">${successPercent}%</span> probability of success
           ${successPercent >= 80 ? '✓' : '⚠️'}
-          <span class="info-hint" style="cursor: help; opacity: 0.7; font-size: 0.875rem;">ⓘ</span>
+        </div>
+        <div class="selected-strategy-label">
+          Using <strong>${selectedStrategyName}</strong> allocation
         </div>
       </div>
     </div>
     
-    <div class="results-grid">
+    <div class="results-grid three-columns">
       <div class="result-card">
         <h4>Portfolio at Retirement</h4>
-        <div class="value">$${formatNumber(monte.portfolioAtRetirement.p50)}</div>
+        <div class="value">$${formatNumber(selectedStrategy?.medianPortfolio || monte.portfolioAtRetirement.p50)}</div>
         <div class="subtext">Median projection at age ${state.inputs.retirementAge}</div>
       </div>
       <div class="result-card">
@@ -50,14 +54,9 @@ export function updateResultsView(recalculateCallback) {
         <div class="subtext">${(monte.withdrawalRate * 100).toFixed(1)}% withdrawal rate</div>
       </div>
       <div class="result-card">
-        <h4>Recommended Allocation</h4>
-        <div class="value">${equityPercent}% Stocks</div>
-        <div class="subtext">Risk profile: ${formatRiskProfile(riskProfile.profile)}</div>
-      </div>
-      <div class="result-card">
         <h4>Expected Portfolio Return</h4>
-        <div class="value">${portfolioStats.expectedReturnFormatted}</div>
-        <div class="subtext">Volatility: ${portfolioStats.volatilityFormatted}</div>
+        <div class="value">${selectedStats.expectedReturnFormatted}</div>
+        <div class="subtext">Volatility: ${selectedStats.volatilityFormatted}</div>
       </div>
     </div>
     
@@ -97,6 +96,66 @@ export function updateResultsView(recalculateCallback) {
     e.preventDefault();
     toggleSidebar(true);
   });
+
+  // Attach strategy card click handlers
+  attachStrategyCardListeners();
+}
+
+function attachStrategyCardListeners() {
+  document.querySelectorAll('.strategy-card').forEach(card => {
+    card.style.cursor = 'pointer';
+    card.addEventListener('click', (e) => {
+      // Don't trigger if clicking on a slider inside the custom card
+      if (e.target.tagName === 'INPUT') return;
+
+      const strategyName = card.querySelector('h4')?.textContent;
+      if (strategyName && strategyName !== 'Build Your Own') {
+        selectStrategy(strategyName);
+      }
+    });
+  });
+}
+
+export function selectStrategy(strategyName) {
+  state.selectedStrategy = strategyName;
+
+  // Get strategy data
+  const { strategyComparison, monte } = state.results;
+  const selectedStrategy = strategyComparison?.find(s => s.name === strategyName);
+
+  if (!selectedStrategy) return;
+
+  // Update summary cards
+  const successPercent = (selectedStrategy.successRate * 100).toFixed(0);
+
+  document.querySelector('.percent').textContent = successPercent + '%';
+  document.querySelector('.success-rate').innerHTML = `
+    <span class="percent">${successPercent}%</span> probability of success
+    ${successPercent >= 80 ? '✓' : '⚠️'}
+  `;
+  document.querySelector('.selected-strategy-label').innerHTML =
+    `Using <strong>${strategyName}</strong> allocation`;
+
+  // Update result cards
+  const resultCards = document.querySelectorAll('.result-card');
+  if (resultCards[0]) {
+    resultCards[0].querySelector('.value').textContent = '$' + formatNumber(selectedStrategy.medianPortfolio);
+  }
+  if (resultCards[2]) {
+    resultCards[2].querySelector('.value').textContent = selectedStrategy.stats.expectedReturnFormatted;
+    resultCards[2].querySelector('.subtext').textContent = 'Volatility: ' + selectedStrategy.stats.volatilityFormatted;
+  }
+
+  // Update visual selection on cards
+  document.querySelectorAll('.strategy-card').forEach(card => {
+    card.classList.remove('selected');
+    if (card.querySelector('h4')?.textContent === strategyName) {
+      card.classList.add('selected');
+    }
+  });
+
+  // Redraw fan chart with selected strategy's trajectory (if available)
+  // For now, we keep the original chart since we'd need to re-run simulation for accurate trajectories
 }
 
 function renderFanChart() {

@@ -878,6 +878,26 @@ body {
   margin-bottom: var(--spacing-xl);
 }
 
+.results-grid.three-columns {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 768px) {
+  .results-grid.three-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.selected-strategy-label {
+  margin-top: var(--spacing-md);
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.selected-strategy-label strong {
+  color: var(--color-accent);
+}
+
 .result-card {
   background: var(--glass-bg);
   backdrop-filter: blur(12px);
@@ -1052,6 +1072,12 @@ body {
 .strategy-card.user-allocation {
   border-color: var(--color-accent);
   background: rgba(212, 169, 66, 0.05);
+}
+
+.strategy-card.selected {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 20px rgba(212, 169, 66, 0.4);
+  background: rgba(212, 169, 66, 0.1);
 }
 
 .recommended-badge,

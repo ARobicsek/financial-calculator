@@ -48,7 +48,8 @@ export const state = {
         useCurrentAllocation: true
     },
     results: null,
-    fanChart: null
+    fanChart: null,
+    selectedStrategy: 'Risk-Matched' // Default to risk-matched strategy
 };
 
 // Simple state reset helper
