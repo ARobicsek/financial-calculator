@@ -3,28 +3,28 @@ import { formatNumber } from '../utils/formatting.js';
 import { runMonteCarloSimulation } from '../../engine/monteCarlo.js';
 
 export function renderStrategyComparison() {
-    const { strategyComparison } = state.results;
+  const { strategyComparison } = state.results;
 
-    if (!strategyComparison || strategyComparison.length === 0) {
-        return '';
-    }
+  if (!strategyComparison || strategyComparison.length === 0) {
+    return '';
+  }
 
-    // Position user's card first, then sort remaining by success rate descending
-    const userCard = strategyComparison.find(s => s.isUserAllocation);
-    const others = strategyComparison.filter(s => !s.isUserAllocation);
-    const sorted = [...(userCard ? [userCard] : []), ...others.sort((a, b) => b.successRate - a.successRate)];
+  // Position user's card first, then sort remaining by success rate descending
+  const userCard = strategyComparison.find(s => s.isUserAllocation);
+  const others = strategyComparison.filter(s => !s.isUserAllocation);
+  const sorted = [...(userCard ? [userCard] : []), ...others.sort((a, b) => b.successRate - a.successRate)];
 
-    return `
+  return `
     <div class="chart-container strategy-comparison">
       <h3 style="margin-bottom: 1rem;">📊 Allocation Strategy Comparison</h3>
       <p class="strategy-intro">Different allocation strategies that could work for your goals. Success rates based on 500 Monte Carlo simulations each.</p>
       
       <div class="strategy-grid">
         ${sorted.map((strategy, index) => {
-        const successPercent = (strategy.successRate * 100).toFixed(0);
-        const isRecommended = index === 0;
+    const successPercent = (strategy.successRate * 100).toFixed(0);
+    const isRecommended = index === 0;
 
-        return `
+    return `
             <div class="strategy-card ${isRecommended ? 'recommended' : ''} ${strategy.isUserAllocation ? 'user-allocation' : ''}">
               ${isRecommended ? '<div class="recommended-badge">Best Match</div>' : ''}
               ${strategy.isUserAllocation ? '<div class="user-badge">Your Portfolio</div>' : ''}
@@ -58,7 +58,7 @@ export function renderStrategyComparison() {
               </div>
             </div>
           `;
-    }).join('')}
+  }).join('')}
         ${renderCustomAllocationCard()}
       </div>
     </div>
@@ -67,39 +67,43 @@ export function renderStrategyComparison() {
 
 // Initialize custom card allocation state
 export let customCardAllocation = {
-    usLargeCap: 35,
-    usSmallCap: 10,
-    intlDeveloped: 20,
-    emergingMarkets: 5,
-    usAggregateBonds: 20,
-    tips: 5,
-    cashMoneyMarket: 5
+  usLargeCap: 24,
+  usSmallCap: 4,
+  intlDeveloped: 10,
+  emergingMarkets: 2,
+  usAggregateBonds: 24,
+  tips: 0,
+  cashMoneyMarket: 36
 };
 
 // These refer to the *custom card result* state
 export let customCardState = {
-    successRate: null,
-    median: null
+  successRate: null,
+  median: null
 };
 
 let customCardDebounceTimer = null;
 
+import { calculatePortfolioStats } from '../../engine/assetAllocation.js';
+
+// ... (existing imports)
+
 export function renderCustomAllocationCard() {
-    const cats = [
-        { key: 'usLargeCap', label: 'US Large Cap' },
-        { key: 'usSmallCap', label: 'US Small/Mid' },
-        { key: 'intlDeveloped', label: 'Intl Developed' },
-        { key: 'emergingMarkets', label: 'Emerging Mkts' },
-        { key: 'usAggregateBonds', label: 'US Bonds' },
-        { key: 'tips', label: 'TIPS' },
-        { key: 'cashMoneyMarket', label: 'Cash' }
-    ];
+  const cats = [
+    { key: 'usLargeCap', label: 'US Large Cap' },
+    { key: 'usSmallCap', label: 'US Small/Mid' },
+    { key: 'intlDeveloped', label: 'Intl Developed' },
+    { key: 'emergingMarkets', label: 'Emerging Mkts' },
+    { key: 'usAggregateBonds', label: 'US Bonds' },
+    { key: 'tips', label: 'TIPS' },
+    { key: 'cashMoneyMarket', label: 'Cash' }
+  ];
 
-    const total = Object.values(customCardAllocation).reduce((s, v) => s + v, 0);
-    const successDisplay = customCardState.successRate !== null ? `${(customCardState.successRate * 100).toFixed(0)}%` : '—';
-    const successClass = customCardState.successRate !== null ? (customCardState.successRate >= 0.80 ? 'good' : customCardState.successRate >= 0.60 ? 'warning' : 'danger') : '';
+  const total = Object.values(customCardAllocation).reduce((s, v) => s + v, 0);
+  const successDisplay = customCardState.successRate !== null ? `${(customCardState.successRate * 100).toFixed(0)}%` : '—';
+  const successClass = customCardState.successRate !== null ? (customCardState.successRate >= 0.80 ? 'good' : customCardState.successRate >= 0.60 ? 'warning' : 'danger') : '';
 
-    return `
+  return `
     <div class="strategy-card custom-allocation-card">
       <div class="custom-badge">Interactive</div>
       <div class="strategy-header">
@@ -113,201 +117,256 @@ export function renderCustomAllocationCard() {
         <span class="success-number ${successClass}" id="customCardSuccess">${successDisplay}</span>
         <span class="success-label">Success Rate <span id="customCardLoading" class="custom-loading hidden">⏳</span></span>
       </div>
-      <div class="custom-sliders">
-        ${cats.map(cat => {
-        const val = Math.round((state.inputs.currentSavings || 0) * (customCardAllocation[cat.key] / 100));
-        return `
-          <div class="custom-slider-row" title="$${formatNumber(val)}">
-            <span class="custom-slider-label">${cat.label}</span>
-            <input type="range" class="custom-card-slider" id="customSlider_${cat.key}" 
-                   data-key="${cat.key}" value="${customCardAllocation[cat.key]}" min="0" max="100" step="5">
-            <span class="custom-slider-value" id="customValue_${cat.key}">${customCardAllocation[cat.key]}%</span>
+      
+      <div class="strategy-details">
+        <div class="strategy-metrics">
+          <div class="detail-row">
+            <span class="detail-label">Median at Retirement</span>
+            <span class="detail-value" id="customCardMedian">${customCardState.median !== null ? '$' + formatNumber(customCardState.median) : '—'}</span>
           </div>
-        `}).join('')}
-        <div class="custom-total ${total === 100 ? 'valid' : 'invalid'}">
-          Total: <strong id="customTotalValue">${total}%</strong> ${total === 100 ? '✓' : ''}
+          <div class="detail-row">
+            <span class="detail-label">Expected Return</span>
+            <span class="detail-value" id="customCardReturn">${customCardState.stats ? customCardState.stats.expectedReturnFormatted : '—'}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Volatility</span>
+            <span class="detail-value" id="customCardVol">${customCardState.stats ? customCardState.stats.volatilityFormatted : '—'}</span>
+          </div>
+        </div>
+      
+        <div class="custom-sliders">
+            ${cats.map(cat => {
+    const val = Math.round((state.inputs.currentSavings || 0) * (customCardAllocation[cat.key] / 100));
+    return `
+              <div class="custom-slider-row" title="$${formatNumber(val)}">
+                <span class="custom-slider-label">${cat.label}</span>
+                <input type="range" class="custom-card-slider" id="customSlider_${cat.key}" 
+                       data-key="${cat.key}" value="${customCardAllocation[cat.key]}" min="0" max="100" step="5">
+                <span class="custom-slider-value" id="customValue_${cat.key}">${customCardAllocation[cat.key]}%</span>
+              </div>
+            `}).join('')}
+            <div class="custom-total ${total === 100 ? 'valid' : 'invalid'}">
+              Total: <strong id="customTotalValue">${total}%</strong> ${total === 100 ? '✓' : ''}
+            </div>
         </div>
       </div>
     </div>
   `;
 }
 
+// Listeners for interactive sliders
 export function attachCustomCardListeners() {
-    document.querySelectorAll('.custom-card-slider').forEach(slider => {
-        slider.addEventListener('input', (e) => {
-            const key = e.target.dataset.key;
-            const newValue = parseInt(e.target.value);
-            const oldValue = customCardAllocation[key];
-            const delta = newValue - oldValue;
+  document.querySelectorAll('.custom-card-slider').forEach(slider => {
+    slider.addEventListener('input', (e) => {
+      const key = e.target.dataset.key;
+      const newValue = parseInt(e.target.value);
+      const oldValue = customCardAllocation[key];
+      const delta = newValue - oldValue;
 
-            // Update this slider's value
-            customCardAllocation[key] = newValue;
-            document.getElementById(`customValue_${key}`).textContent = `${newValue}%`;
-            const val = Math.round((state.inputs.currentSavings || 0) * (newValue / 100));
-            e.target.closest('.custom-slider-row').title = `$${formatNumber(val)}`;
+      // Update this slider's value
+      customCardAllocation[key] = newValue;
+      document.getElementById(`customValue_${key}`).textContent = `${newValue}%`;
+      const val = Math.round((state.inputs.currentSavings || 0) * (newValue / 100));
+      e.target.closest('.custom-slider-row').title = `$${formatNumber(val)}`;
 
-            // Rebalance others proportionally to maintain ~100%
-            if (delta !== 0) {
-                rebalanceOtherSliders(key, delta);
-            }
+      // Rebalance others proportionally to maintain ~100%
+      if (delta !== 0) {
+        rebalanceOtherSliders(key, delta);
+      }
 
-            updateCustomCardTotal();
-            debouncedCustomSimulation();
-        });
+      updateCustomCardTotal();
+      debouncedCustomSimulation();
     });
+  });
 }
 
 function rebalanceOtherSliders(changedKey, delta) {
-    const keys = Object.keys(customCardAllocation).filter(k => k !== changedKey);
-    const changedValue = customCardAllocation[changedKey];
-    const targetOtherTotal = 100 - changedValue;
+  const keys = Object.keys(customCardAllocation).filter(k => k !== changedKey);
+  const changedValue = customCardAllocation[changedKey];
+  const targetOtherTotal = 100 - changedValue;
 
-    const currentOtherTotal = keys.reduce((s, k) => s + customCardAllocation[k], 0);
+  const currentOtherTotal = keys.reduce((s, k) => s + customCardAllocation[k], 0);
 
-    if (currentOtherTotal === 0) {
-        const perSlider = Math.floor(targetOtherTotal / keys.length / 5) * 5;
-        let remaining = targetOtherTotal;
-        keys.forEach((key, i) => {
-            if (i === keys.length - 1) {
-                customCardAllocation[key] = Math.max(0, remaining);
-            } else {
-                customCardAllocation[key] = perSlider;
-                remaining -= perSlider;
-            }
-            document.getElementById(`customValue_${key}`).textContent = `${customCardAllocation[key]}%`;
-            const el = document.getElementById(`customSlider_${key}`);
-            el.value = customCardAllocation[key];
-            const val = Math.round((state.inputs.currentSavings || 0) * (customCardAllocation[key] / 100));
-            el.closest('.custom-slider-row').title = `$${formatNumber(val)}`;
-        });
-        return;
-    }
-
-    if (targetOtherTotal <= 0) {
-        keys.forEach(key => {
-            customCardAllocation[key] = 0;
-            document.getElementById(`customValue_${key}`).textContent = '0%';
-            const el = document.getElementById(`customSlider_${key}`);
-            el.value = 0;
-            el.closest('.custom-slider-row').title = `$0`;
-        });
-        return;
-    }
-
-    const scaleFactor = targetOtherTotal / currentOtherTotal;
-    let allocated = 0;
-
+  if (currentOtherTotal === 0) {
+    const perSlider = Math.floor(targetOtherTotal / keys.length / 5) * 5;
+    let remaining = targetOtherTotal;
     keys.forEach((key, i) => {
-        const oldValue = customCardAllocation[key];
-        let newValue;
-
-        if (i === keys.length - 1) {
-            newValue = targetOtherTotal - allocated;
-        } else {
-            newValue = Math.round((oldValue * scaleFactor) / 5) * 5;
-        }
-
-        newValue = Math.max(0, Math.min(100, newValue));
-        customCardAllocation[key] = newValue;
-        allocated += newValue;
-
-        document.getElementById(`customValue_${key}`).textContent = `${newValue}%`;
-        const el = document.getElementById(`customSlider_${key}`);
-        el.value = newValue;
-        const val = Math.round((state.inputs.currentSavings || 0) * (newValue / 100));
-        el.closest('.custom-slider-row').title = `$${formatNumber(val)}`;
+      if (i === keys.length - 1) {
+        customCardAllocation[key] = Math.max(0, remaining);
+      } else {
+        customCardAllocation[key] = perSlider;
+        remaining -= perSlider;
+      }
+      document.getElementById(`customValue_${key}`).textContent = `${customCardAllocation[key]}%`;
+      const el = document.getElementById(`customSlider_${key}`);
+      el.value = customCardAllocation[key];
+      const val = Math.round((state.inputs.currentSavings || 0) * (customCardAllocation[key] / 100));
+      el.closest('.custom-slider-row').title = `$${formatNumber(val)}`;
     });
+    return;
+  }
+
+  if (targetOtherTotal <= 0) {
+    keys.forEach(key => {
+      customCardAllocation[key] = 0;
+      document.getElementById(`customValue_${key}`).textContent = '0%';
+      const el = document.getElementById(`customSlider_${key}`);
+      el.value = 0;
+      el.closest('.custom-slider-row').title = `$0`;
+    });
+    return;
+  }
+
+  const scaleFactor = targetOtherTotal / currentOtherTotal;
+  let allocated = 0;
+
+  keys.forEach((key, i) => {
+    const oldValue = customCardAllocation[key];
+    let newValue;
+
+    if (i === keys.length - 1) {
+      newValue = targetOtherTotal - allocated;
+    } else {
+      newValue = Math.round((oldValue * scaleFactor) / 5) * 5;
+    }
+
+    newValue = Math.max(0, Math.min(100, newValue));
+    customCardAllocation[key] = newValue;
+    allocated += newValue;
+
+    document.getElementById(`customValue_${key}`).textContent = `${newValue}%`;
+    const el = document.getElementById(`customSlider_${key}`);
+    el.value = newValue;
+    const val = Math.round((state.inputs.currentSavings || 0) * (newValue / 100));
+    el.closest('.custom-slider-row').title = `$${formatNumber(val)}`;
+  });
 }
 
 function updateCustomCardTotal() {
-    const total = Object.values(customCardAllocation).reduce((s, v) => s + v, 0);
-    const totalEl = document.getElementById('customTotalValue');
-    if (totalEl) {
-        totalEl.textContent = `${total}%`;
-        totalEl.parentElement.className = `custom-total ${total === 100 ? 'valid' : 'invalid'}`;
-        totalEl.parentElement.innerHTML = `Total: <strong id="customTotalValue">${total}%</strong> ${total === 100 ? '✓' : ''}`;
-    }
+  const total = Object.values(customCardAllocation).reduce((s, v) => s + v, 0);
+  const totalEl = document.getElementById('customTotalValue');
+  if (totalEl) {
+    totalEl.textContent = `${total}%`;
+    totalEl.parentElement.className = `custom-total ${total === 100 ? 'valid' : 'invalid'}`;
+    totalEl.parentElement.innerHTML = `Total: <strong id="customTotalValue">${total}%</strong> ${total === 100 ? '✓' : ''}`;
+  }
 }
 
 function debouncedCustomSimulation() {
-    const loadingEl = document.getElementById('customCardLoading');
-    if (loadingEl) loadingEl.classList.remove('hidden');
+  const loadingEl = document.getElementById('customCardLoading');
+  if (loadingEl) loadingEl.classList.remove('hidden');
 
-    if (customCardDebounceTimer) clearTimeout(customCardDebounceTimer);
+  if (customCardDebounceTimer) clearTimeout(customCardDebounceTimer);
 
-    customCardDebounceTimer = setTimeout(() => {
-        runCustomCardSimulation();
-    }, 400);
+  customCardDebounceTimer = setTimeout(() => {
+    runCustomCardSimulation();
+  }, 400);
 }
 
 function runCustomCardSimulation() {
-    const total = Object.values(customCardAllocation).reduce((s, v) => s + v, 0);
-    if (total !== 100) {
-        customCardState.successRate = null;
-        customCardState.median = null;
-        const successEl = document.getElementById('customCardSuccess');
-        if (successEl) {
-            successEl.textContent = '—';
-            successEl.className = 'success-number';
-        }
-        const loadingEl = document.getElementById('customCardLoading');
-        if (loadingEl) loadingEl.classList.add('hidden');
-        return;
+  const total = Object.values(customCardAllocation).reduce((s, v) => s + v, 0);
+  if (total !== 100) {
+    customCardState.successRate = null;
+    customCardState.median = null;
+    customCardState.stats = null;
+    updateCustomCardUI();
+    return;
+  }
+
+  // Build allocation object (convert % to decimal)
+  const allocation = {};
+  for (const [key, value] of Object.entries(customCardAllocation)) {
+    allocation[key] = value / 100;
+  }
+
+  // Calculate stats
+  const stats = calculatePortfolioStats(allocation);
+  customCardState.stats = stats;
+
+  // Debug: Log the simulation inputs
+  console.log('=== Custom Card Simulation ===');
+  console.log('Inputs from state:', {
+    age: state.inputs.age,
+    retirementAge: state.inputs.retirementAge,
+    endAge: state.inputs.endAge,
+    currentSavings: state.inputs.currentSavings,
+    windfall: state.inputs.windfall,
+    desiredIncome: state.inputs.desiredIncome,
+    withdrawalStrategy: state.inputs.withdrawalStrategy
+  });
+  console.log('Allocation:', allocation);
+
+  // Run quick simulation (200 iterations)
+  const result = runMonteCarloSimulation({
+    currentAge: state.inputs.age,
+    retirementAge: state.inputs.retirementAge,
+    endAge: state.inputs.endAge,
+    currentSavings: state.inputs.currentSavings,
+    windfall: state.inputs.windfall,
+    monthlyContribution: state.inputs.monthlyContribution,
+    desiredIncome: state.inputs.desiredIncome,
+    withdrawalStrategy: state.inputs.withdrawalStrategy,
+    allocation: allocation,
+    glidePathEnabled: state.inputs.useGlidePath,
+    iterations: 200 // Fewer iterations for interactive speed
+  });
+
+  console.log('Result:', {
+    successRate: result.successRate,
+    successCount: result.successCount,
+    initialWithdrawal: result.initialWithdrawal,
+    withdrawalRate: result.withdrawalRate
+  });
+
+  customCardState.successRate = result.successRate;
+  customCardState.median = result.portfolioAtRetirement.p50;
+
+  updateCustomCardUI();
+}
+
+function updateCustomCardUI() {
+  const successEl = document.getElementById('customCardSuccess');
+  if (successEl) {
+    if (customCardState.successRate !== null) {
+      const pct = (customCardState.successRate * 100).toFixed(0);
+      successEl.textContent = `${pct}%`;
+      successEl.className = `success-number ${pct >= 80 ? 'good' : pct >= 60 ? 'warning' : 'danger'}`;
+    } else {
+      successEl.textContent = '—';
+      successEl.className = 'success-number';
     }
+  }
 
-    // Build allocation object (convert % to decimal)
-    const allocation = {};
-    for (const [key, value] of Object.entries(customCardAllocation)) {
-        allocation[key] = value / 100;
-    }
+  const medianEl = document.getElementById('customCardMedian');
+  if (medianEl) medianEl.textContent = customCardState.median !== null ? '$' + formatNumber(customCardState.median) : '—';
 
-    // Run quick simulation (200 iterations)
-    const result = runMonteCarloSimulation({
-        currentAge: state.inputs.age,
-        retirementAge: state.inputs.retirementAge,
-        endAge: state.inputs.endAge,
-        currentSavings: state.inputs.currentSavings,
-        windfall: state.inputs.windfall,
-        monthlyContribution: state.inputs.monthlyContribution,
-        desiredIncome: state.inputs.desiredIncome,
-        withdrawalStrategy: state.inputs.withdrawalStrategy,
-        allocation: allocation,
-        glidePathEnabled: state.inputs.useGlidePath,
-        iterations: 200 // Fewer iterations for interactive speed
-    });
+  const returnEl = document.getElementById('customCardReturn');
+  if (returnEl) returnEl.textContent = customCardState.stats ? customCardState.stats.expectedReturnFormatted : '—';
 
-    customCardState.successRate = result.successRate;
-    customCardState.median = result.portfolioAtRetirement.p50;
+  const volEl = document.getElementById('customCardVol');
+  if (volEl) volEl.textContent = customCardState.stats ? customCardState.stats.volatilityFormatted : '—';
 
-    // Update UI
-    const successEl = document.getElementById('customCardSuccess');
-    if (successEl) {
-        const pct = (customCardState.successRate * 100).toFixed(0);
-        successEl.textContent = `${pct}%`;
-        successEl.className = `success-number ${pct >= 80 ? 'good' : pct >= 60 ? 'warning' : 'danger'}`;
-    }
-
-    const loadingEl = document.getElementById('customCardLoading');
-    if (loadingEl) loadingEl.classList.add('hidden');
+  const loadingEl = document.getElementById('customCardLoading');
+  if (loadingEl) loadingEl.classList.add('hidden');
 }
 
 function renderAllocationBreakdown(allocation) {
-    const assetTypes = [
-        { key: 'usLargeCap', name: 'US Large Cap Stocks', tickers: 'VTI, VOO, SPY, S&P 500 index funds' },
-        { key: 'usSmallCap', name: 'US Small/Mid Cap', tickers: 'VB, VXF, IJR, extended market' },
-        { key: 'intlDeveloped', name: 'International Developed', tickers: 'VXUS, VEA, SCHF (Europe, Japan, etc.)' },
-        { key: 'emergingMarkets', name: 'Emerging Markets', tickers: 'VWO, IEMG (China, India, Brazil, etc.)' },
-        { key: 'usAggregateBonds', name: 'US Bonds (Aggregate)', tickers: 'BND, AGG, investment-grade bonds' },
-        { key: 'tips', name: 'TIPS / I-Bonds', tickers: 'SCHP, VTIP, inflation-protected' },
-        { key: 'cashMoneyMarket', name: 'Cash / Money Market', tickers: 'VMFXX, savings, CDs' }
-    ];
+  const assetTypes = [
+    { key: 'usLargeCap', name: 'US Large Cap Stocks', tickers: 'VTI, VOO, SPY, S&P 500 index funds' },
+    { key: 'usSmallCap', name: 'US Small/Mid Cap', tickers: 'VB, VXF, IJR, extended market' },
+    { key: 'intlDeveloped', name: 'International Developed', tickers: 'VXUS, VEA, SCHF (Europe, Japan, etc.)' },
+    { key: 'emergingMarkets', name: 'Emerging Markets', tickers: 'VWO, IEMG (China, India, Brazil, etc.)' },
+    { key: 'usAggregateBonds', name: 'US Bonds (Aggregate)', tickers: 'BND, AGG, investment-grade bonds' },
+    { key: 'tips', name: 'TIPS / I-Bonds', tickers: 'SCHP, VTIP, inflation-protected' },
+    { key: 'cashMoneyMarket', name: 'Cash / Money Market', tickers: 'VMFXX, savings, CDs' }
+  ];
 
-    return `
+  return `
     <div class="allocation-breakdown">
       ${assetTypes.map(asset => {
-        const pct = (allocation[asset.key] || 0) * 100;
-        const val = Math.round((state.inputs.currentSavings || 0) * (allocation[asset.key] || 0));
-        return `
+    const pct = (allocation[asset.key] || 0) * 100;
+    const val = Math.round((state.inputs.currentSavings || 0) * (allocation[asset.key] || 0));
+    return `
           <div class="allocation-row" title="$${formatNumber(val)}">
             <div class="allocation-row-header">
               <span class="allocation-asset-name">${asset.name}</span>
@@ -319,7 +378,7 @@ function renderAllocationBreakdown(allocation) {
             <span class="allocation-ticker">${asset.tickers}</span>
           </div>
         `;
-    }).join('')}
+  }).join('')}
     </div>
   `;
 }

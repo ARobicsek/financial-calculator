@@ -17,15 +17,15 @@ export const state = {
     inputs: {
         // Basic Info
         age: 52,
-        currentSavings: 500000,
-        windfall: 200000,
+        currentSavings: 10400000,
+        windfall: 800000,
         monthlyContribution: 2000,
         // Goals
         retirementAge: 65,
-        desiredIncome: 60000,
+        desiredIncome: 400000,
         endAge: 95,
         // Risk
-        riskAnswers: [],
+        riskAnswers: [4, 4, 3, 4, 5, 4, 3, 3],
         // Social Security
         socialSecurityAge: 67,
         socialSecurityMonthly: 2500,
@@ -37,15 +37,15 @@ export const state = {
         withdrawalStrategy: 'guardrails',
         // Current Portfolio Allocation
         currentAllocation: {
-            usLargeCap: 40,
-            usSmallMidCap: 5,
+            usLargeCap: 24,
+            usSmallMidCap: 4,
             intlDeveloped: 10,
-            emergingMarkets: 5,
-            usBonds: 25,
-            tips: 5,
-            cashMoneyMarket: 10
+            emergingMarkets: 2,
+            usBonds: 24,
+            tips: 0,
+            cashMoneyMarket: 36
         },
-        useCurrentAllocation: false
+        useCurrentAllocation: true
     },
     results: null,
     fanChart: null

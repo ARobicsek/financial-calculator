@@ -2,7 +2,7 @@ import { state } from '../state.js';
 // import { renderInlineEditor, attachInlineEditorListeners } from './inlineEditor.js'; // Disabling inline editor in dashboard mode
 import { renderStrategyComparison, attachCustomCardListeners } from './strategyComparison.js';
 import { formatNumber, formatRiskProfile } from '../utils/formatting.js';
-import { showMethodology } from './sidebar.js';
+import { showMethodology, toggleSidebar, setupAssumptionsSidebar } from './sidebar.js';
 import { FUND_RECOMMENDATIONS } from '../../data/marketData.js';
 import { Chart } from 'chart.js';
 
@@ -21,13 +21,14 @@ export function updateResultsView(recalculateCallback) {
       <h2>Your Projections</h2>
     </div>
     
-    <div class="primary-result">
+    <div class="primary-result" title="Based on the Risk-Matched allocation calculated from your risk questionnaire answers. This represents the success rate across 1,000 Monte Carlo simulations using your personalized asset allocation.">
       <div class="funded-age">
         <div class="label">Your plan is funded through age</div>
         <div class="age">${monte.fundedThroughAge}</div>
         <div class="success-rate">
           <span class="percent">${successPercent}%</span> probability of success
           ${successPercent >= 80 ? '✓' : '⚠️'}
+          <span class="info-hint" style="cursor: help; opacity: 0.7; font-size: 0.875rem;">ⓘ</span>
         </div>
       </div>
     </div>
@@ -70,7 +71,6 @@ export function updateResultsView(recalculateCallback) {
     </div>
     
     ${renderStrategyComparison()}
-    ${renderRecommendations()}
     ${renderFundTable()}
     ${renderAssumptionsUsed()}
   `;
@@ -78,10 +78,19 @@ export function updateResultsView(recalculateCallback) {
   renderFanChart();
   attachCustomCardListeners();
 
+  // Setup assumptions sidebar
+  setupAssumptionsSidebar();
+
   // Attach methodology link listener
   document.getElementById('methodologyLink')?.addEventListener('click', (e) => {
     e.preventDefault();
     showMethodology();
+  });
+
+  // Attach assumptions sidebar button listener
+  document.getElementById('viewAssumptionsBtn')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    toggleSidebar(true);
   });
 }
 
@@ -240,7 +249,10 @@ function renderFundTable() {
 function renderAssumptionsUsed() {
   return `
     <div class="chart-container" style="background: rgba(212, 169, 66, 0.05); border-color: rgba(212, 169, 66, 0.3);">
-      <h3 style="margin-bottom: 1rem; color: var(--color-accent);">📋 Assumptions Used</h3>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h3 style="margin: 0; color: var(--color-accent);">📋 Assumptions Used</h3>
+        <button id="viewAssumptionsBtn" class="btn btn-secondary btn-small" style="font-size: 0.75rem;">View All Assumptions</button>
+      </div>
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; font-size: 0.875rem;">
         <div>
           <strong>US Large Cap:</strong> 5.5% return, 17% vol<br>

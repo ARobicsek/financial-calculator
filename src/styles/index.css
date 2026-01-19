@@ -173,6 +173,96 @@ body {
   background: rgba(212, 169, 66, 0.1);
 }
 
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-right: 320px;
+  /* Clear the sidebar width */
+}
+
+.nav-link {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.nav-link:hover {
+  color: var(--color-accent);
+  background: rgba(212, 169, 66, 0.1);
+}
+
+/* ===========================================
+   Collapsible Dashboard Cards
+   =========================================== */
+.dashboard-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  margin-bottom: var(--spacing-md);
+  box-shadow: var(--glass-shadow);
+  transition: all var(--transition-normal);
+  overflow: hidden;
+}
+
+.dashboard-card.collapsed {
+  background: rgba(17, 24, 39, 0.4);
+}
+
+.card-header {
+  padding: var(--spacing-lg) var(--spacing-xl);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  border-bottom: 1px solid var(--glass-border);
+  transition: background var(--transition-fast);
+}
+
+.card-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.dashboard-card.collapsed .card-header {
+  border-bottom-color: transparent;
+}
+
+.card-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin: 0;
+}
+
+.card-header-icon {
+  color: var(--color-text-secondary);
+  transition: transform var(--transition-normal);
+  display: flex;
+  align-items: center;
+}
+
+.dashboard-card.collapsed .card-header-icon {
+  transform: rotate(-90deg);
+}
+
+.card-content {
+  padding: var(--spacing-xl);
+  animation: fadeIn 0.3s ease;
+}
+
+.dashboard-card.collapsed .card-content {
+  display: none;
+}
+
 /* ===========================================
    Main Content Area
    =========================================== */
@@ -182,6 +272,10 @@ body {
   width: 100%;
   margin: 0 auto;
   padding: var(--spacing-2xl) var(--spacing-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+  /* Increase vertical spacing between sections */
 }
 
 /* ===========================================
@@ -1789,4 +1883,118 @@ body {
 
 .custom-loading.hidden {
   display: none;
+}
+
+/* ===========================================
+   Methodology Modal
+   =========================================== */
+.methodology-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease;
+  padding: var(--spacing-xl);
+}
+
+.methodology-modal {
+  background: var(--color-bg-card);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  max-width: 700px;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: var(--spacing-2xl);
+  position: relative;
+  box-shadow: var(--shadow-xl);
+  animation: slideIn 0.3s ease;
+}
+
+.methodology-modal h2 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-accent);
+  margin-bottom: var(--spacing-xl);
+  padding-right: var(--spacing-2xl);
+}
+
+.methodology-close {
+  position: absolute;
+  top: var(--spacing-lg);
+  right: var(--spacing-lg);
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 2rem;
+  cursor: pointer;
+  line-height: 1;
+  transition: color var(--transition-fast);
+}
+
+.methodology-close:hover {
+  color: var(--color-text-primary);
+}
+
+.methodology-section {
+  margin-bottom: var(--spacing-xl);
+  padding-bottom: var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.methodology-section:last-of-type {
+  border-bottom: none;
+}
+
+.methodology-section h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-md);
+}
+
+.methodology-section p {
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-sm);
+  line-height: 1.6;
+}
+
+.methodology-section ul {
+  margin: 0;
+  padding-left: var(--spacing-xl);
+  color: var(--color-text-secondary);
+}
+
+.methodology-section li {
+  margin-bottom: var(--spacing-sm);
+  line-height: 1.5;
+}
+
+.methodology-section li strong {
+  color: var(--color-text-primary);
+}
+
+.methodology-section em {
+  color: var(--color-accent);
+  font-style: italic;
+}
+
+.methodology-disclaimer {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  margin-top: var(--spacing-lg);
+}
+
+.methodology-disclaimer strong {
+  color: var(--color-danger);
 }

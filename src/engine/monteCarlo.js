@@ -105,6 +105,7 @@ function runSingleSimulation(params) {
     let currentAllocation = { ...allocation };
     let currentWithdrawal = annualWithdrawal;
     let lastYearReturn = 0;
+    let minWithdrawalRatio = 1; // Track lowest withdrawal ratio vs target
 
     const trajectory = [{
         age: currentAge,
@@ -172,6 +173,11 @@ function runSingleSimulation(params) {
         // Track annual return for guardrails
         if (month % 12 === 0) {
             lastYearReturn = monthlyReturn * 12; // Approximation
+            // Track minimum withdrawal ratio (how much income was cut)
+            if (isRetired && annualWithdrawal > 0) {
+                const withdrawalRatio = currentWithdrawal / annualWithdrawal;
+                minWithdrawalRatio = Math.min(minWithdrawalRatio, withdrawalRatio);
+            }
         }
 
         // Record trajectory at year boundaries
@@ -199,10 +205,15 @@ function runSingleSimulation(params) {
         }
     }
 
+    // Consider "failed" if portfolio depleted OR income was ever cut below target
+    const incomeCut = minWithdrawalRatio < 1.0;
+
     return {
         trajectory,
         finalPortfolio: portfolio,
         depleted: portfolio <= 0,
+        incomeCut,
+        minWithdrawalRatio,
         depletedAge: portfolio <= 0 ? trajectory.find(t => t.portfolio === 0)?.age : null
     };
 }
@@ -267,11 +278,14 @@ export function runMonteCarloSimulation(params, iterations = 1000) {
     const inflationRate = MARKET_DATA.inflation.expected;
 
     // Calculate initial withdrawal at retirement
-    // Project portfolio to retirement first for planning
+    // Adjust desiredIncome for inflation from today to retirement
     const yearsToRetirement = retirementAge - currentAge;
+    const inflationAdjustedIncome = desiredIncome * Math.pow(1 + inflationRate, yearsToRetirement);
+
+    // Project portfolio to retirement for fallback calculation
     const projectedAtRetirement = initialPortfolio * Math.pow(1.055, yearsToRetirement) +
         (monthlyContribution * 12) * ((Math.pow(1.055, yearsToRetirement) - 1) / 0.055);
-    const plannedWithdrawal = desiredIncome || projectedAtRetirement * withdrawalRate;
+    const plannedWithdrawal = inflationAdjustedIncome || projectedAtRetirement * withdrawalRate;
 
     const simParams = {
         currentAge,
@@ -294,8 +308,12 @@ export function runMonteCarloSimulation(params, iterations = 1000) {
 
     // Analyze results
     const finalPortfolios = results.map(r => r.finalPortfolio);
-    const successCount = results.filter(r => !r.depleted).length;
+    // Success = portfolio didn't deplete AND income was never cut below target
+    const successCount = results.filter(r => !r.depleted && !r.incomeCut).length;
     const successRate = successCount / iterations;
+
+    // Also track partial success (portfolio survived but income was cut)
+    const partialSuccessCount = results.filter(r => !r.depleted && r.incomeCut).length;
 
     // Calculate "funded through" age
     const fundedAges = results.map(r => {
