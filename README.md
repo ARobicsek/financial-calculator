@@ -45,3 +45,7 @@ The "Near-Term Crash Probability" slider in Advanced Settings allows stress test
 - Removed "Recommended Low-Cost Funds" table
 - Added animated ellipsis during Monte Carlo calculation
 - "Build Your Own" card now correctly updates main dashboard when selected
+- **Fixed "Build Your Own" slider interactions** using robust event delegation
+- **Refined Rent vs Buy analysis** to correctly compare strategy vs. strategy-without-home
+- Removed hover question marks from assumptions sidebar
+

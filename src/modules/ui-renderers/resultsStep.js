@@ -429,6 +429,24 @@ export function updateHousingComparison(strategyName, allocation) {
   const contentDiv = document.getElementById('housingComparisonContent');
   if (!housingParams || !contentDiv) return;
 
+  // Grey out for Build Your Own - too complex to properly compare
+  if (strategyName === 'Build Your Own') {
+    contentDiv.innerHTML = `
+      <div style="text-align: center; padding: 2rem; opacity: 0.6;">
+        <p style="color: var(--color-text-muted); font-style: italic;">
+          Rent vs. Buy analysis is not available for custom allocations.<br>
+          <span style="font-size: 0.875rem;">Select a preset strategy to see housing comparison.</span>
+        </p>
+      </div>
+    `;
+    // Update subtitle
+    const subtitle = document.getElementById('housingSubtitle');
+    if (subtitle) {
+      subtitle.textContent = 'Select a preset strategy to compare housing scenarios';
+    }
+    return;
+  }
+
   // Check if this strategy has home allocation
   const hasHome = (allocation.residentialRealEstate || 0) > 0;
 

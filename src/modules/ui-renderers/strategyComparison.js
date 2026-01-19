@@ -73,7 +73,8 @@ export let customCardAllocation = {
   emergingMarkets: 2,
   usAggregateBonds: 24,
   tips: 0,
-  cashMoneyMarket: 36
+  cashMoneyMarket: 36,
+  residentialRealEstate: 0
 };
 
 // These refer to the *custom card result* state
@@ -86,10 +87,18 @@ let customCardDebounceTimer = null;
 
 import { calculatePortfolioStats } from '../../engine/assetAllocation.js';
 
-// ... (existing imports)
-
 export function renderCustomAllocationCard() {
-  const cats = [
+  // Sync home allocation from user inputs if they have configured one
+  const userHomeAlloc = state.inputs.currentAllocation?.residentialRealEstate || 0;
+  if (userHomeAlloc > 0 && customCardAllocation.residentialRealEstate === 0) {
+    // Initialize custom card's home allocation to match user's portfolio
+    customCardAllocation.residentialRealEstate = userHomeAlloc;
+    // Reduce cash proportionally to accommodate home
+    customCardAllocation.cashMoneyMarket = Math.max(0, customCardAllocation.cashMoneyMarket - userHomeAlloc);
+  }
+
+  // Build categories - always include home if user has configured home ownership
+  const baseCats = [
     { key: 'usLargeCap', label: 'US Large Cap' },
     { key: 'usSmallCap', label: 'US Small/Mid' },
     { key: 'intlDeveloped', label: 'Intl Developed' },
@@ -98,6 +107,11 @@ export function renderCustomAllocationCard() {
     { key: 'tips', label: 'TIPS' },
     { key: 'cashMoneyMarket', label: 'Cash' }
   ];
+
+  // Add home slider if user has configured housing params
+  const cats = state.results?.housingParams
+    ? [...baseCats, { key: 'residentialRealEstate', label: 'House' }]
+    : baseCats;
 
   const total = Object.values(customCardAllocation).reduce((s, v) => s + v, 0);
   const successDisplay = customCardState.successRate !== null ? `${(customCardState.successRate * 100).toFixed(0)}%` : '—';
@@ -154,30 +168,61 @@ export function renderCustomAllocationCard() {
   `;
 }
 
-// Listeners for interactive sliders
+// Listeners for interactive sliders using event delegation
+// This ensures events are caught even after DOM replacement
+
+function handleSliderInput(e) {
+  // Check if target is a slider - robust against different events or bubbling
+  if (!e.target || !e.target.matches || !e.target.matches('.custom-card-slider')) return;
+
+  // LOGGING: Check if event is caught
+  console.log('Slider Input Event:', e.type, e.target.dataset.key, e.target.value);
+
+  const key = e.target.dataset.key;
+  const newValue = parseInt(e.target.value);
+
+  // Safety check for key existence
+  if (customCardAllocation[key] === undefined) return;
+
+  const oldValue = customCardAllocation[key];
+  const delta = newValue - oldValue;
+
+  // Update this slider's value
+  customCardAllocation[key] = newValue;
+
+  const valueEl = document.getElementById(`customValue_${key}`);
+  if (valueEl) valueEl.textContent = `${newValue}%`;
+
+  const val = Math.round((state.inputs.currentSavings || 0) * (newValue / 100));
+  const rowEl = e.target.closest('.custom-slider-row');
+  if (rowEl) rowEl.title = `$${formatNumber(val)}`;
+
+  // Rebalance others proportionally to maintain ~100%
+  if (delta !== 0) {
+    rebalanceOtherSliders(key, delta);
+  }
+
+  updateCustomCardTotal();
+  debouncedCustomSimulation();
+}
+
 export function attachCustomCardListeners() {
-  document.querySelectorAll('.custom-card-slider').forEach(slider => {
-    slider.addEventListener('input', (e) => {
-      const key = e.target.dataset.key;
-      const newValue = parseInt(e.target.value);
-      const oldValue = customCardAllocation[key];
-      const delta = newValue - oldValue;
+  // Clear any pending debounce timer from previous render
+  if (customCardDebounceTimer) {
+    clearTimeout(customCardDebounceTimer);
+    customCardDebounceTimer = null;
+  }
 
-      // Update this slider's value
-      customCardAllocation[key] = newValue;
-      document.getElementById(`customValue_${key}`).textContent = `${newValue}%`;
-      const val = Math.round((state.inputs.currentSavings || 0) * (newValue / 100));
-      e.target.closest('.custom-slider-row').title = `$${formatNumber(val)}`;
+  // Use event delegation - attach once to document
+  // We remove the listener first to ensure we don't duplicate if called multiple times
+  document.removeEventListener('input', handleSliderInput);
+  document.addEventListener('input', handleSliderInput);
 
-      // Rebalance others proportionally to maintain ~100%
-      if (delta !== 0) {
-        rebalanceOtherSliders(key, delta);
-      }
+  // Also listen for change events as backup (for some browsers/devices)
+  document.removeEventListener('change', handleSliderInput);
+  document.addEventListener('change', handleSliderInput);
 
-      updateCustomCardTotal();
-      debouncedCustomSimulation();
-    });
-  });
+  console.log('Custom card listeners attached to document');
 }
 
 function rebalanceOtherSliders(changedKey, delta) {
@@ -296,6 +341,15 @@ function runCustomCardSimulation() {
   });
   console.log('Allocation:', allocation);
 
+  // Check if this allocation includes home ownership
+  const hasHome = (allocation.residentialRealEstate || 0) > 0;
+
+  // For Build Your Own, don't use complex housing params (rent/cost modeling)
+  // because the user's configured rent doesn't properly scale with custom home sizes.
+  // Instead, treat residential real estate as a simple appreciating asset class.
+  // The Rent vs Buy comparison is already disabled for Build Your Own.
+  const housingParams = null;
+
   // Run quick simulation (200 iterations)
   const result = runMonteCarloSimulation({
     currentAge: state.inputs.age,
@@ -308,6 +362,7 @@ function runCustomCardSimulation() {
     withdrawalStrategy: state.inputs.withdrawalStrategy,
     allocation: allocation,
     glidePathEnabled: state.inputs.useGlidePath,
+    housingParams: housingParams,
     nearTermCrashProbability: state.inputs.nearTermCrashProbability,
     iterations: 200 // Fewer iterations for interactive speed
   });
