@@ -78,12 +78,26 @@ function attachDashboardListeners() {
     });
   }
 
-  // Portfolio Sliders
+  // Portfolio Sliders - update display on input, re-render on change (release)
   document.querySelectorAll('.allocation-slider').forEach(slider => {
+    // Update display value in real-time as user drags
     slider.addEventListener('input', (e) => {
       const key = e.target.dataset.key;
       const valSpan = document.getElementById(`${key}Value`);
       if (valSpan) valSpan.textContent = `${e.target.value}%`;
+
+      // Update state immediately
+      if (state.inputs.currentAllocation.hasOwnProperty(key)) {
+        state.inputs.currentAllocation[key] = parseInt(e.target.value) || 0;
+      }
+    });
+
+    // Only re-render housing config on slider release (change event)
+    slider.addEventListener('change', (e) => {
+      const key = e.target.dataset.key;
+      if (key === 'residentialRealEstate') {
+        refreshPortfolioCard();
+      }
     });
   });
 
@@ -114,4 +128,67 @@ function attachDashboardListeners() {
   document.getElementById('useCurrentAllocation')?.addEventListener('change', (e) => {
     // Toggle visibility of allocation section if needed, or just state
   });
+
+  // Initialize housing input listeners if they exist
+  initHousingInputListeners();
 }
+
+// Helper to attach portfolio slider listeners (for re-renders)
+function attachPortfolioSliderListeners() {
+  document.querySelectorAll('.allocation-slider').forEach(slider => {
+    // Update display value in real-time as user drags
+    slider.addEventListener('input', (e) => {
+      const key = e.target.dataset.key;
+      const valSpan = document.getElementById(`${key}Value`);
+      if (valSpan) valSpan.textContent = `${e.target.value}%`;
+
+      // Update state immediately
+      if (state.inputs.currentAllocation.hasOwnProperty(key)) {
+        state.inputs.currentAllocation[key] = parseInt(e.target.value) || 0;
+      }
+    });
+
+    // Only re-render housing config on slider release (change event)
+    slider.addEventListener('change', (e) => {
+      const key = e.target.dataset.key;
+      if (key === 'residentialRealEstate') {
+        refreshPortfolioCard();
+      }
+    });
+  });
+
+  // Also initialize housing config listeners
+  initHousingInputListeners();
+}
+
+function refreshPortfolioCard() {
+  const portfolioCard = document.getElementById('card-portfolio');
+  if (portfolioCard) {
+    const cardContent = portfolioCard.querySelector('.card-content');
+    if (cardContent) {
+      cardContent.innerHTML = renderPortfolioStep();
+      attachPortfolioSliderListeners();
+    }
+  }
+}
+
+// Initialize housing configuration input listeners
+function initHousingInputListeners() {
+  const housingInputs = ['monthlyRent', 'expectedHoldingYears', 'propertyTaxRate',
+    'annualInsurance', 'maintenanceRate', 'monthlyHOA'];
+
+  housingInputs.forEach(inputId => {
+    const input = document.getElementById(inputId);
+    if (input) {
+      input.addEventListener('change', (e) => {
+        const value = parseFloat(e.target.value) || 0;
+        if (inputId === 'propertyTaxRate' || inputId === 'maintenanceRate') {
+          state.inputs.housing[inputId] = value / 100;
+        } else {
+          state.inputs.housing[inputId] = value;
+        }
+      });
+    }
+  });
+}
+

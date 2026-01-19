@@ -43,9 +43,19 @@ export const state = {
             emergingMarkets: 2,
             usBonds: 24,
             tips: 0,
-            cashMoneyMarket: 36
+            cashMoneyMarket: 36,
+            residentialRealEstate: 0  // Home purchase as allocation %
         },
-        useCurrentAllocation: true
+        useCurrentAllocation: true,
+        // Housing Configuration (for residential real estate allocation)
+        housing: {
+            monthlyRent: 14000,           // Current rent payment
+            propertyTaxRate: 0.012,       // 1.2% of home value annually
+            annualInsurance: 8000,        // Home insurance
+            maintenanceRate: 0.01,        // 1% of home value annually
+            monthlyHOA: 500,              // HOA fees
+            expectedHoldingYears: 13      // Years before potential sale
+        }
     },
     results: null,
     fanChart: null,

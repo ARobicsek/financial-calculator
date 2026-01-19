@@ -2024,3 +2024,169 @@ body {
 .methodology-disclaimer strong {
   color: var(--color-danger);
 }
+
+/* ===========================================
+   Housing Configuration Styles
+   =========================================== */
+.home-allocation {
+  background: rgba(212, 169, 66, 0.05);
+  border: 1px dashed var(--color-accent);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+}
+
+.home-allocation .allocation-label {
+  color: var(--color-accent);
+}
+
+.housing-config-section {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
+  margin-top: var(--spacing-md);
+}
+
+.housing-config-section h4 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  margin-bottom: var(--spacing-md);
+}
+
+.housing-summary {
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-lg);
+  line-height: 1.7;
+}
+
+.housing-summary strong {
+  color: var(--color-text-primary);
+}
+
+.housing-summary .positive {
+  color: var(--color-success);
+}
+
+.housing-summary .negative {
+  color: var(--color-danger);
+}
+
+.housing-inputs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-lg);
+  margin-bottom: var(--spacing-xl);
+}
+
+.housing-inputs-grid .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.housing-inputs-grid .form-group label {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.housing-inputs-grid .input-with-prefix,
+.housing-inputs-grid .input-with-suffix {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.housing-inputs-grid .prefix,
+.housing-inputs-grid .suffix {
+  position: absolute;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.housing-inputs-grid .prefix {
+  left: var(--spacing-md);
+}
+
+.housing-inputs-grid .suffix {
+  right: var(--spacing-md);
+}
+
+.housing-inputs-grid input {
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-bg-dark);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font-size: 1rem;
+  transition: border-color var(--transition-fast);
+}
+
+.housing-inputs-grid .input-with-prefix input {
+  padding-left: 2rem;
+}
+
+.housing-inputs-grid .input-with-suffix input {
+  padding-right: 3rem;
+}
+
+.housing-inputs-grid input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.housing-cost-breakdown {
+  background: var(--color-bg-dark);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-lg);
+}
+
+.housing-cost-breakdown .cost-item {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--spacing-sm) 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.housing-cost-breakdown .cost-item:last-child {
+  border-bottom: none;
+}
+
+.housing-cost-breakdown .cost-item.highlight {
+  font-weight: 600;
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.02);
+  margin: var(--spacing-sm) calc(var(--spacing-lg) * -1);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-radius: var(--radius-md);
+}
+
+.housing-cost-breakdown .positive {
+  color: var(--color-success);
+}
+
+.housing-cost-breakdown .negative {
+  color: var(--color-danger);
+}
+
+.housing-hint {
+  background: rgba(212, 169, 66, 0.08);
+  border: 1px dashed var(--color-accent);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+}
+
+.housing-hint p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.housing-hint strong {
+  color: var(--color-accent);
+}

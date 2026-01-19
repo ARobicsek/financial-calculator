@@ -2,8 +2,11 @@ import { state } from '../state.js';
 
 export function renderPortfolioStep() {
   const alloc = state.inputs.currentAllocation;
+  const housing = state.inputs.housing;
   const total = Object.values(alloc).reduce((sum, v) => sum + v, 0);
   const isValid = total === 100;
+  const totalPortfolio = state.inputs.currentSavings + state.inputs.windfall;
+  const homeValue = (alloc.residentialRealEstate / 100) * totalPortfolio;
 
   const categories = [
     { key: 'usLargeCap', label: 'US Large Cap Stocks', hint: 'VTI, VOO, SPY, S&P 500 index funds' },
@@ -12,8 +15,19 @@ export function renderPortfolioStep() {
     { key: 'emergingMarkets', label: 'Emerging Markets', hint: 'VWO, IEMG (China, India, Brazil, etc.)' },
     { key: 'usBonds', label: 'US Bonds (Aggregate)', hint: 'BND, AGG, investment-grade bonds' },
     { key: 'tips', label: 'TIPS / I-Bonds', hint: 'SCHP, VTIP, inflation-protected' },
-    { key: 'cashMoneyMarket', label: 'Cash / Money Market', hint: 'VMFXX, savings, CDs' }
+    { key: 'cashMoneyMarket', label: 'Cash / Money Market', hint: 'VMFXX, savings, CDs' },
+    { key: 'residentialRealEstate', label: '🏠 Primary Home', hint: 'Buy a home instead of renting' }
   ];
+
+  // Calculate annual ownership costs
+  const annualOwnershipCosts = homeValue > 0 ?
+    (homeValue * housing.propertyTaxRate) +
+    housing.annualInsurance +
+    (homeValue * housing.maintenanceRate) +
+    (housing.monthlyHOA * 12) : 0;
+  const monthlyOwnershipCosts = annualOwnershipCosts / 12;
+  const annualRent = housing.monthlyRent * 12;
+  const monthlySavings = housing.monthlyRent - monthlyOwnershipCosts;
 
   return `
     <div class="portfolio-allocation">
@@ -25,7 +39,7 @@ export function renderPortfolioStep() {
       
       <div class="allocation-grid">
         ${categories.map(cat => `
-          <div class="allocation-item">
+          <div class="allocation-item ${cat.key === 'residentialRealEstate' ? 'home-allocation' : ''}">
             <div class="allocation-header">
               <label class="allocation-label">${cat.label}</label>
               <span class="allocation-value" id="${cat.key}Value">${alloc[cat.key]}%</span>
@@ -33,10 +47,94 @@ export function renderPortfolioStep() {
             <input type="range" class="allocation-slider" id="${cat.key}Slider" 
                    value="${alloc[cat.key]}" min="0" max="100" step="1"
                    data-key="${cat.key}">
-            <span class="form-hint">${cat.hint}</span>
+            <span class="form-hint">${cat.hint}${cat.key === 'residentialRealEstate' && alloc.residentialRealEstate > 0 ? ` = $${(homeValue / 1000000).toFixed(2)}M home` : ''}</span>
           </div>
         `).join('')}
       </div>
+      
+      ${alloc.residentialRealEstate > 0 ? `
+      <div class="housing-config-section">
+        <h4>🏠 Home Purchase Configuration</h4>
+        <p class="housing-summary">
+          Buying a <strong>$${(homeValue / 1000000).toFixed(2)}M</strong> home eliminates rent of 
+          <strong>$${housing.monthlyRent.toLocaleString()}/mo</strong>, saving 
+          <strong class="${monthlySavings > 0 ? 'positive' : 'negative'}">$${Math.abs(monthlySavings).toLocaleString()}/mo</strong>
+          ${monthlySavings > 0 ? 'vs. ownership costs' : 'more than renting'}.
+        </p>
+        
+        <div class="housing-inputs-grid">
+          <div class="form-group">
+            <label>Current Monthly Rent</label>
+            <div class="input-with-prefix">
+              <span class="prefix">$</span>
+              <input type="number" id="monthlyRent" value="${housing.monthlyRent}" min="0" max="50000" step="500">
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>Expected Holding Period</label>
+            <div class="input-with-suffix">
+              <input type="number" id="expectedHoldingYears" value="${housing.expectedHoldingYears}" min="1" max="40" step="1">
+              <span class="suffix">years</span>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>Property Tax Rate</label>
+            <div class="input-with-suffix">
+              <input type="number" id="propertyTaxRate" value="${(housing.propertyTaxRate * 100).toFixed(2)}" min="0" max="5" step="0.1">
+              <span class="suffix">%</span>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>Annual Insurance</label>
+            <div class="input-with-prefix">
+              <span class="prefix">$</span>
+              <input type="number" id="annualInsurance" value="${housing.annualInsurance}" min="0" max="50000" step="500">
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>Maintenance Rate</label>
+            <div class="input-with-suffix">
+              <input type="number" id="maintenanceRate" value="${(housing.maintenanceRate * 100).toFixed(2)}" min="0" max="5" step="0.1">
+              <span class="suffix">%</span>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>Monthly HOA</label>
+            <div class="input-with-prefix">
+              <span class="prefix">$</span>
+              <input type="number" id="monthlyHOA" value="${housing.monthlyHOA}" min="0" max="5000" step="100">
+            </div>
+          </div>
+        </div>
+        
+        <div class="housing-cost-breakdown">
+          <div class="cost-item">
+            <span>Annual Rent (current):</span>
+            <span>$${annualRent.toLocaleString()}</span>
+          </div>
+          <div class="cost-item">
+            <span>Annual Ownership Costs:</span>
+            <span>$${Math.round(annualOwnershipCosts).toLocaleString()}</span>
+          </div>
+          <div class="cost-item highlight">
+            <span>Net Annual Savings from Buying:</span>
+            <span class="${annualRent - annualOwnershipCosts > 0 ? 'positive' : 'negative'}">
+              $${Math.abs(Math.round(annualRent - annualOwnershipCosts)).toLocaleString()}
+              ${annualRent - annualOwnershipCosts > 0 ? 'saved' : 'extra cost'}
+            </span>
+          </div>
+        </div>
+      </div>
+      ` : `
+      <div class="housing-hint">
+        <p>💡 <strong>Considering buying a home?</strong> Allocate some percentage to "Primary Home" above to compare buying vs. renting.</p>
+      </div>
+      `}
       
       <div class="portfolio-actions">
         <label class="use-allocation-checkbox">
@@ -46,4 +144,24 @@ export function renderPortfolioStep() {
       </div>
     </div>
   `;
+}
+
+// Initialize housing input event listeners
+export function initHousingInputListeners() {
+  const housingInputs = ['monthlyRent', 'expectedHoldingYears', 'propertyTaxRate',
+    'annualInsurance', 'maintenanceRate', 'monthlyHOA'];
+
+  housingInputs.forEach(inputId => {
+    const input = document.getElementById(inputId);
+    if (input) {
+      input.addEventListener('change', (e) => {
+        const value = parseFloat(e.target.value) || 0;
+        if (inputId === 'propertyTaxRate' || inputId === 'maintenanceRate') {
+          state.inputs.housing[inputId] = value / 100; // Convert from % to decimal
+        } else {
+          state.inputs.housing[inputId] = value;
+        }
+      });
+    }
+  });
 }

@@ -14,7 +14,8 @@ export const MARKET_DATA = {
         tips: 0.020,              // 2.0% real + inflation
         highYieldBonds: 0.058,    // 5.8%
         reits: 0.080,             // 8.0%
-        cashMoneyMarket: 0.028    // 2.8%
+        cashMoneyMarket: 0.028,   // 2.8%
+        residentialRealEstate: 0.035  // 3.5% nominal (~1% real after inflation)
     },
 
     // Annual volatility (standard deviation)
@@ -27,7 +28,8 @@ export const MARKET_DATA = {
         tips: 0.06,
         highYieldBonds: 0.10,
         reits: 0.18,
-        cashMoneyMarket: 0.01
+        cashMoneyMarket: 0.01,
+        residentialRealEstate: 0.08   // 8% volatility, lower than equities
     },
 
     // Current economic environment
@@ -64,7 +66,8 @@ export const ASSUMPTION_TOOLTIPS = {
         tips: "Treasury Inflation-Protected Securities. Returns 2% real yield plus actual inflation. Excellent hedge against unexpected inflation spikes but returns lag in low-inflation environments.",
         highYieldBonds: "Below-investment-grade corporate bonds. Higher yield (5.8%) compensates for default risk. Behaves partly like stocks during market stress—less diversification benefit.",
         reits: "Real Estate Investment Trusts. Expected 8% return with real estate appreciation plus rental income. Interest-rate sensitive; performs differently in various economic cycles.",
-        cashMoneyMarket: "Money market funds, T-bills, high-yield savings. Currently yielding ~2.8% but rates expected to decline as Fed normalizes policy. Essential for near-term expenses and emergency funds."
+        cashMoneyMarket: "Money market funds, T-bills, high-yield savings. Currently yielding ~2.8% but rates expected to decline as Fed normalizes policy. Essential for near-term expenses and emergency funds.",
+        residentialRealEstate: "Primary home ownership. Expected 3.5% nominal return (~1% real after inflation) based on Case-Shiller historical data. Lower volatility (8%) than equities but illiquid. Eliminates rent payments but adds property taxes, insurance, and maintenance costs (~2-4% of home value annually)."
     }
 };
 

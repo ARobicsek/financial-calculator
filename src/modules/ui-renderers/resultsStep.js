@@ -77,6 +77,7 @@ export function updateResultsView(recalculateCallback) {
     </div>
     
     ${renderStrategyComparison()}
+    ${renderHousingComparison()}
     ${renderFundTable()}
     ${renderAssumptionsUsed()}
   `;
@@ -380,3 +381,131 @@ function renderAssumptionsUsed() {
     </div>
   `;
 }
+
+function renderHousingComparison() {
+  const housing = state.results.housingComparison;
+  if (!housing) return '';
+
+  const rentSuccess = (housing.rent.successRate * 100).toFixed(0);
+  const buySuccess = (housing.buy.successRate * 100).toFixed(0);
+  const buyWins = housing.comparison.buyWinsPercentage.toFixed(0);
+  const breakEven = housing.comparison.breakEvenYear;
+  const monthlySavings = housing.comparison.monthlySavingsFromBuying;
+
+  // Determine winner
+  const buyIsBetter = housing.buy.finalNetWorth.p50 > housing.rent.finalNetWorth.p50;
+  const successDiff = Math.abs(buySuccess - rentSuccess);
+
+  return `
+    <div class="chart-container housing-comparison-card" style="border: 2px solid var(--color-accent); background: rgba(212, 169, 66, 0.05);">
+      <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem;">
+        <span style="font-size: 1.75rem;">🏠</span>
+        <div>
+          <h3 style="margin: 0; color: var(--color-accent);">Rent vs. Buy Analysis</h3>
+          <p style="margin: 0; font-size: 0.875rem; color: var(--color-text-secondary);">
+            Buying a $${(housing.inputs.homePurchasePrice / 1000000).toFixed(2)}M home vs. continuing to rent
+          </p>
+        </div>
+      </div>
+      
+      <div class="housing-comparison-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 1.5rem;">
+        <div class="comparison-column rent-column" style="padding: 1.25rem; background: var(--color-bg-card); border-radius: var(--radius-lg);">
+          <h4 style="margin: 0 0 1rem 0; color: var(--color-text-secondary); font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em;">
+            🔑 Continue Renting
+          </h4>
+          <div style="font-size: 2rem; font-weight: 700; color: var(--color-text-primary); margin-bottom: 0.5rem;">
+            ${rentSuccess}%
+          </div>
+          <div style="font-size: 0.875rem; color: var(--color-text-secondary); margin-bottom: 1rem;">
+            Success Rate
+          </div>
+          <div style="border-top: 1px solid var(--color-border); padding-top: 1rem;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+              <span style="color: var(--color-text-muted);">Median Net Worth</span>
+              <span style="font-weight: 600;">$${formatNumber(housing.rent.finalNetWorth.p50)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+              <span style="color: var(--color-text-muted);">10th Percentile</span>
+              <span>$${formatNumber(housing.rent.finalNetWorth.p10)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: var(--color-text-muted);">90th Percentile</span>
+              <span>$${formatNumber(housing.rent.finalNetWorth.p90)}</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="comparison-column buy-column" style="padding: 1.25rem; background: var(--color-bg-card); border-radius: var(--radius-lg); ${buyIsBetter ? 'border: 2px solid var(--color-success);' : ''}">
+          <h4 style="margin: 0 0 1rem 0; color: var(--color-text-secondary); font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em;">
+            🏠 Buy Home
+          </h4>
+          <div style="font-size: 2rem; font-weight: 700; color: var(--color-text-primary); margin-bottom: 0.5rem;">
+            ${buySuccess}%
+          </div>
+          <div style="font-size: 0.875rem; color: var(--color-text-secondary); margin-bottom: 1rem;">
+            Success Rate
+          </div>
+          <div style="border-top: 1px solid var(--color-border); padding-top: 1rem;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+              <span style="color: var(--color-text-muted);">Median Net Worth</span>
+              <span style="font-weight: 600; color: ${buyIsBetter ? 'var(--color-success)' : 'inherit'};">
+                $${formatNumber(housing.buy.finalNetWorth.p50)}
+              </span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+              <span style="color: var(--color-text-muted);">10th Percentile</span>
+              <span>$${formatNumber(housing.buy.finalNetWorth.p10)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: var(--color-text-muted);">90th Percentile</span>
+              <span>$${formatNumber(housing.buy.finalNetWorth.p90)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="housing-insights" style="background: var(--color-bg-dark); border-radius: var(--radius-md); padding: 1.25rem;">
+        <h4 style="margin: 0 0 1rem 0; font-size: 1rem;">Key Insights</h4>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+          <div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: ${buyWins > 50 ? 'var(--color-success)' : 'var(--color-warning)'};">
+              ${buyWins}%
+            </div>
+            <div style="font-size: 0.875rem; color: var(--color-text-muted);">
+              of simulations where buying wins
+            </div>
+          </div>
+          <div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: var(--color-accent);">
+              ${breakEven ? breakEven + ' years' : 'N/A'}
+            </div>
+            <div style="font-size: 0.875rem; color: var(--color-text-muted);">
+              break-even point
+            </div>
+          </div>
+          <div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: ${monthlySavings > 0 ? 'var(--color-success)' : 'var(--color-danger)'};">
+              $${formatNumber(Math.abs(monthlySavings))}/mo
+            </div>
+            <div style="font-size: 0.875rem; color: var(--color-text-muted);">
+              ${monthlySavings > 0 ? 'saved by buying' : 'extra owning vs rent'}
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div style="margin-top: 1.25rem; padding: 1rem; background: rgba(212, 169, 66, 0.1); border-radius: var(--radius-md);">
+        <p style="margin: 0; font-size: 0.875rem; color: var(--color-text-secondary);">
+          💡 <strong style="color: var(--color-accent);">Recommendation:</strong> 
+          ${buyWins > 60 ?
+      `Buying appears advantageous in ${buyWins}% of scenarios. With a ${housing.inputs.expectedHoldingYears}-year holding period and $${formatNumber(housing.inputs.monthlyRent)}/mo rent savings, home ownership builds more wealth in most market conditions.` :
+      buyWins > 40 ?
+        `It's a close call. Renting and buying perform similarly. Consider non-financial factors like stability, flexibility, and life plans.` :
+        `Renting appears advantageous. The initial capital reduction from buying, combined with your time horizon and rent costs, suggests keeping your portfolio liquid may be better.`
+    }
+        </p>
+      </div>
+    </div>
+  `;
+}
+

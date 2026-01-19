@@ -445,3 +445,395 @@ export function quickProjection(params) {
         totalGrowth: (portfolioGrowth + contributionGrowth) - initialPortfolio - (monthlyContribution * months)
     };
 }
+
+/**
+ * Generate a monthly return for residential real estate
+ * Correlated with inflation and equities
+ */
+function generateHomeReturn(inflationFactor, equityFactor) {
+    const { expectedReturns, volatility } = MARKET_DATA;
+    const annualReturn = expectedReturns.residentialRealEstate || 0.035;
+    const annualVol = volatility.residentialRealEstate || 0.08;
+
+    const monthlyMean = annualReturn / 12;
+    const monthlyVol = annualVol / Math.sqrt(12);
+
+    // Correlated with inflation (0.6) and equities (0.2)
+    const systematic = 0.6 * inflationFactor + 0.2 * equityFactor;
+    const idiosyncratic = generateStandardNormal() * 0.8;
+    const combinedZ = systematic * 0.4 + idiosyncratic * 0.6;
+
+    // Use lognormal for real estate (prevents negative values)
+    const logReturn = monthlyMean - (monthlyVol * monthlyVol) / 2 + monthlyVol * combinedZ;
+    return Math.exp(logReturn) - 1;
+}
+
+/**
+ * Run a single simulation path with home ownership
+ * Tracks both liquid portfolio and home equity
+ */
+function runSingleSimulationWithHome(params) {
+    const {
+        currentAge,
+        retirementAge,
+        endAge,
+        initialLiquidPortfolio,
+        initialHomeValue,
+        monthlyContribution,
+        monthlyRentSavings,      // Rent eliminated by home purchase
+        monthlyOwnershipCosts,   // Property tax, insurance, maintenance, HOA
+        annualWithdrawal,
+        withdrawalStrategy,
+        allocation,
+        glidePathEnabled,
+        inflationRate,
+        holdingPeriodYears,      // Expected holding period
+        isRenter = false         // Whether this is the renting scenario
+    } = params;
+
+    const { expectedReturns, volatility } = MARKET_DATA;
+    const monthsToRetirement = (retirementAge - currentAge) * 12;
+    const totalMonths = (endAge - currentAge) * 12;
+    const holdingPeriodMonths = holdingPeriodYears * 12;
+
+    let portfolio = initialLiquidPortfolio;
+    let homeValue = isRenter ? 0 : initialHomeValue;
+    let currentAllocation = { ...allocation };
+    let currentWithdrawal = annualWithdrawal;
+    let lastYearReturn = 0;
+    let minWithdrawalRatio = 1;
+    let hasSoldHome = false;
+    let monthlyRent = isRenter ? (params.originalMonthlyRent || 0) : 0;
+
+    const trajectory = [{
+        age: currentAge,
+        portfolio: portfolio,
+        homeValue: homeValue,
+        netWorth: portfolio + homeValue,
+        phase: 'accumulation'
+    }];
+
+    for (let month = 1; month <= totalMonths; month++) {
+        const currentAgeInMonths = currentAge * 12 + month;
+        const age = currentAgeInMonths / 12;
+        const isRetired = month > monthsToRetirement;
+
+        // Generate common market factors for correlation
+        const equityFactor = generateStandardNormal();
+        const bondFactor = generateStandardNormal();
+        const inflationFactor = generateStandardNormal();
+
+        // Apply glide path (reduce equities)
+        if (glidePathEnabled && month % 12 === 0 && !isRetired) {
+            const equityReduction = 0.015;
+            let totalEquity = (currentAllocation.usLargeCap || 0) +
+                (currentAllocation.usSmallCap || 0) +
+                (currentAllocation.intlDeveloped || 0) +
+                (currentAllocation.emergingMarkets || 0);
+
+            if (totalEquity > 0.20) {
+                const reductionFactor = (totalEquity - equityReduction) / totalEquity;
+                const bondIncrease = equityReduction;
+
+                if (currentAllocation.usLargeCap) currentAllocation.usLargeCap *= reductionFactor;
+                if (currentAllocation.usSmallCap) currentAllocation.usSmallCap *= reductionFactor;
+                if (currentAllocation.intlDeveloped) currentAllocation.intlDeveloped *= reductionFactor;
+                if (currentAllocation.emergingMarkets) currentAllocation.emergingMarkets *= reductionFactor;
+                currentAllocation.usAggregateBonds = (currentAllocation.usAggregateBonds || 0) + bondIncrease;
+            }
+        }
+
+        // Generate portfolio return
+        const monthlyReturn = generatePortfolioReturn(currentAllocation, expectedReturns, volatility);
+        portfolio *= (1 + monthlyReturn);
+
+        // Handle home value if owner and hasn't sold
+        if (!isRenter && !hasSoldHome && homeValue > 0) {
+            const homeReturn = generateHomeReturn(inflationFactor, equityFactor);
+            homeValue *= (1 + homeReturn);
+
+            // Check if it's time to sell (at holding period)
+            if (month === holdingPeriodMonths && month < totalMonths) {
+                const sellingCosts = 0.06; // 6% selling costs
+                const netProceeds = homeValue * (1 - sellingCosts);
+                portfolio += netProceeds;
+                homeValue = 0;
+                hasSoldHome = true;
+
+                // Calculate current inflation-adjusted rent
+                const yearsOwned = holdingPeriodYears;
+                monthlyRent = (params.originalMonthlyRent || 0) * Math.pow(1 + inflationRate, yearsOwned);
+            }
+        }
+
+        // Apply contributions or withdrawals
+        if (!isRetired) {
+            // Accumulation phase
+            if (isRenter) {
+                // Renter: standard contribution (rent is part of expenses, not modeled separately)
+                portfolio += monthlyContribution;
+            } else if (!hasSoldHome) {
+                // Homeowner: contribution + rent savings - ownership costs
+                const netMonthlyBenefit = monthlyRentSavings - monthlyOwnershipCosts;
+                portfolio += monthlyContribution + netMonthlyBenefit;
+            } else {
+                // Sold home, back to renting: just standard contribution
+                portfolio += monthlyContribution;
+            }
+        } else {
+            // Distribution phase
+            let monthlyWithdrawal = currentWithdrawal / 12;
+
+            // If sold home and now renting, need to add rent to expenses
+            if (hasSoldHome && !isRenter) {
+                monthlyWithdrawal += monthlyRent;
+            }
+
+            if (withdrawalStrategy === 'guardrails' && month % 12 === 0) {
+                currentWithdrawal = applyGuardrails(
+                    portfolio,
+                    currentWithdrawal,
+                    inflationRate,
+                    lastYearReturn,
+                    endAge - age
+                );
+            } else if (withdrawalStrategy === 'fixed' && month % 12 === 0) {
+                currentWithdrawal *= (1 + inflationRate);
+                if (hasSoldHome) {
+                    monthlyRent *= (1 + inflationRate); // Rent inflates
+                }
+            }
+
+            portfolio -= monthlyWithdrawal;
+        }
+
+        // Track annual return for guardrails
+        if (month % 12 === 0) {
+            lastYearReturn = monthlyReturn * 12;
+            if (isRetired && annualWithdrawal > 0) {
+                const withdrawalRatio = currentWithdrawal / annualWithdrawal;
+                minWithdrawalRatio = Math.min(minWithdrawalRatio, withdrawalRatio);
+            }
+        }
+
+        // Record trajectory at year boundaries
+        if (month % 12 === 0) {
+            trajectory.push({
+                age: Math.round(age),
+                portfolio: Math.max(0, portfolio),
+                homeValue: homeValue,
+                netWorth: Math.max(0, portfolio) + homeValue,
+                phase: isRetired ? 'distribution' : 'accumulation'
+            });
+        }
+
+        // Check for portfolio depletion
+        if (portfolio <= 0) {
+            portfolio = 0;
+            const remainingYears = Math.ceil((totalMonths - month) / 12);
+            for (let y = 0; y < remainingYears; y++) {
+                trajectory.push({
+                    age: Math.round(age + y + 1),
+                    portfolio: 0,
+                    homeValue: homeValue,
+                    netWorth: homeValue,
+                    phase: 'depleted'
+                });
+            }
+            break;
+        }
+    }
+
+    const incomeCut = minWithdrawalRatio < 1.0;
+
+    return {
+        trajectory,
+        finalPortfolio: portfolio,
+        finalHomeValue: homeValue,
+        finalNetWorth: portfolio + homeValue,
+        depleted: portfolio <= 0,
+        incomeCut,
+        minWithdrawalRatio,
+        depletedAge: portfolio <= 0 ? trajectory.find(t => t.portfolio === 0)?.age : null,
+        hasSoldHome
+    };
+}
+
+/**
+ * Run housing comparison simulation (Rent vs Buy)
+ * Runs parallel simulations for both scenarios with correlated market conditions
+ */
+export function runHousingComparisonSimulation(params, iterations = 500) {
+    const {
+        currentAge = 52,
+        retirementAge = 65,
+        endAge = 95,
+        currentSavings = 10000000,
+        windfall = 0,
+        monthlyContribution = 2000,
+        desiredIncome = 400000,
+        withdrawalStrategy = 'guardrails',
+        allocation = {},
+        glidePathEnabled = true,
+        // Housing-specific params
+        homePurchasePrice = 2500000,
+        monthlyRent = 14000,
+        propertyTaxRate = 0.012,
+        annualInsurance = 8000,
+        maintenanceRate = 0.01,
+        monthlyHOA = 500,
+        expectedHoldingYears = 13
+    } = params;
+
+    const totalPortfolio = currentSavings + windfall;
+    const inflationRate = MARKET_DATA.inflation.expected;
+
+    // Calculate monthly ownership costs
+    const annualOwnershipCosts =
+        (homePurchasePrice * propertyTaxRate) +
+        annualInsurance +
+        (homePurchasePrice * maintenanceRate) +
+        (monthlyHOA * 12);
+    const monthlyOwnershipCosts = annualOwnershipCosts / 12;
+
+    // Adjust desired income for inflation to retirement
+    const yearsToRetirement = retirementAge - currentAge;
+    const inflationAdjustedIncome = desiredIncome * Math.pow(1 + inflationRate, yearsToRetirement);
+
+    const rentResults = [];
+    const buyResults = [];
+
+    for (let i = 0; i < iterations; i++) {
+        // RENT scenario: Full portfolio, standard contributions
+        const rentResult = runSingleSimulationWithHome({
+            currentAge,
+            retirementAge,
+            endAge,
+            initialLiquidPortfolio: totalPortfolio,
+            initialHomeValue: 0,
+            monthlyContribution,
+            monthlyRentSavings: 0,
+            monthlyOwnershipCosts: 0,
+            annualWithdrawal: inflationAdjustedIncome,
+            withdrawalStrategy,
+            allocation: normalizeAllocation(allocation),
+            glidePathEnabled,
+            inflationRate,
+            holdingPeriodYears: 0,
+            isRenter: true,
+            originalMonthlyRent: monthlyRent
+        });
+        rentResults.push(rentResult);
+
+        // BUY scenario: Reduced portfolio, increased contributions from rent savings
+        const buyResult = runSingleSimulationWithHome({
+            currentAge,
+            retirementAge,
+            endAge,
+            initialLiquidPortfolio: totalPortfolio - homePurchasePrice,
+            initialHomeValue: homePurchasePrice,
+            monthlyContribution,
+            monthlyRentSavings: monthlyRent,
+            monthlyOwnershipCosts,
+            annualWithdrawal: inflationAdjustedIncome,
+            withdrawalStrategy,
+            allocation: normalizeAllocation(allocation),
+            glidePathEnabled,
+            inflationRate,
+            holdingPeriodYears: expectedHoldingYears,
+            isRenter: false,
+            originalMonthlyRent: monthlyRent
+        });
+        buyResults.push(buyResult);
+    }
+
+    // Analyze results
+    const rentFinals = rentResults.map(r => r.finalNetWorth);
+    const buyFinals = buyResults.map(r => r.finalNetWorth);
+
+    const rentSuccessCount = rentResults.filter(r => !r.depleted && !r.incomeCut).length;
+    const buySuccessCount = buyResults.filter(r => !r.depleted && !r.incomeCut).length;
+
+    // Calculate which scenario wins more often
+    let buyWinsCount = 0;
+    for (let i = 0; i < iterations; i++) {
+        if (buyResults[i].finalNetWorth > rentResults[i].finalNetWorth) {
+            buyWinsCount++;
+        }
+    }
+
+    // Calculate break-even year (when buying becomes advantageous in median case)
+    let breakEvenYear = null;
+    for (let year = 1; year <= endAge - currentAge; year++) {
+        const rentMedians = rentResults.map(r =>
+            r.trajectory.find(t => t.age === currentAge + year)?.netWorth || 0
+        );
+        const buyMedians = buyResults.map(r =>
+            r.trajectory.find(t => t.age === currentAge + year)?.netWorth || 0
+        );
+
+        const rentMedian = percentile(rentMedians, 50);
+        const buyMedian = percentile(buyMedians, 50);
+
+        if (buyMedian > rentMedian && breakEvenYear === null) {
+            breakEvenYear = year;
+            break;
+        }
+    }
+
+    return {
+        rent: {
+            successRate: rentSuccessCount / iterations,
+            finalNetWorth: {
+                p10: percentile(rentFinals, 10),
+                p25: percentile(rentFinals, 25),
+                p50: percentile(rentFinals, 50),
+                p75: percentile(rentFinals, 75),
+                p90: percentile(rentFinals, 90)
+            },
+            trajectoryByAge: buildTrajectoryByAge(rentResults, currentAge, endAge)
+        },
+        buy: {
+            successRate: buySuccessCount / iterations,
+            finalNetWorth: {
+                p10: percentile(buyFinals, 10),
+                p25: percentile(buyFinals, 25),
+                p50: percentile(buyFinals, 50),
+                p75: percentile(buyFinals, 75),
+                p90: percentile(buyFinals, 90)
+            },
+            trajectoryByAge: buildTrajectoryByAge(buyResults, currentAge, endAge),
+            soldHomeCount: buyResults.filter(r => r.hasSoldHome).length
+        },
+        comparison: {
+            buyWinsPercentage: (buyWinsCount / iterations) * 100,
+            breakEvenYear: breakEvenYear,
+            monthlySavingsFromBuying: monthlyRent - monthlyOwnershipCosts,
+            initialPortfolioDifference: homePurchasePrice
+        },
+        inputs: {
+            homePurchasePrice,
+            monthlyRent,
+            monthlyOwnershipCosts,
+            expectedHoldingYears
+        }
+    };
+}
+
+function buildTrajectoryByAge(results, currentAge, endAge) {
+    const trajectoryByAge = {};
+    for (let age = currentAge; age <= endAge; age++) {
+        const netWorths = results
+            .map(r => r.trajectory.find(t => t.age === age)?.netWorth || 0);
+
+        trajectoryByAge[age] = {
+            p10: percentile(netWorths, 10),
+            p25: percentile(netWorths, 25),
+            p50: percentile(netWorths, 50),
+            p75: percentile(netWorths, 75),
+            p90: percentile(netWorths, 90)
+        };
+    }
+    return trajectoryByAge;
+}
+

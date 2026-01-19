@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { runMonteCarloSimulation } from '../engine/monteCarlo.js';
+import { runMonteCarloSimulation, runHousingComparisonSimulation } from '../engine/monteCarlo.js';
 import { calculateAllocation, calculatePortfolioStats } from '../engine/assetAllocation.js';
 import { calculateRiskProfile } from '../components/RiskQuestionnaire.js';
 import { updateResultsView } from './ui-renderers/resultsStep.js';
@@ -44,11 +44,21 @@ function scrapeDashboardInputs() {
     // Portfolio
     state.inputs.useCurrentAllocation = document.getElementById('useCurrentAllocation')?.checked ?? false;
     // Sliders
-    const allocKeys = ['usLargeCap', 'usSmallMidCap', 'intlDeveloped', 'emergingMarkets', 'usBonds', 'tips', 'cashMoneyMarket'];
+    const allocKeys = ['usLargeCap', 'usSmallMidCap', 'intlDeveloped', 'emergingMarkets', 'usBonds', 'tips', 'cashMoneyMarket', 'residentialRealEstate'];
     allocKeys.forEach(key => {
         const slider = document.getElementById(`${key}Slider`);
         if (slider) state.inputs.currentAllocation[key] = parseInt(slider.value) || 0;
     });
+
+    // Housing configuration
+    if (state.inputs.currentAllocation.residentialRealEstate > 0) {
+        state.inputs.housing.monthlyRent = parseFloat(document.getElementById('monthlyRent')?.value) || 0;
+        state.inputs.housing.expectedHoldingYears = parseInt(document.getElementById('expectedHoldingYears')?.value) || 13;
+        state.inputs.housing.propertyTaxRate = (parseFloat(document.getElementById('propertyTaxRate')?.value) || 1.2) / 100;
+        state.inputs.housing.annualInsurance = parseFloat(document.getElementById('annualInsurance')?.value) || 0;
+        state.inputs.housing.maintenanceRate = (parseFloat(document.getElementById('maintenanceRate')?.value) || 1) / 100;
+        state.inputs.housing.monthlyHOA = parseFloat(document.getElementById('monthlyHOA')?.value) || 0;
+    }
 
     // Goals
     state.inputs.retirementAge = parseInt(document.getElementById('retirementAge')?.value) || 65;
@@ -206,4 +216,34 @@ function performCalculation() {
         portfolioStats: calculatePortfolioStats(allocationResult.allocation),
         strategyComparison: strategyResults
     };
+
+    // Run housing comparison if user has allocated to residential real estate
+    const homeAllocation = state.inputs.currentAllocation.residentialRealEstate || 0;
+    if (homeAllocation > 0) {
+        const totalPortfolio = state.inputs.currentSavings + state.inputs.windfall;
+        const homePurchasePrice = (homeAllocation / 100) * totalPortfolio;
+
+        const housingComparison = runHousingComparisonSimulation({
+            currentAge: state.inputs.age,
+            retirementAge: state.inputs.retirementAge,
+            endAge: state.inputs.endAge,
+            currentSavings: state.inputs.currentSavings,
+            windfall: state.inputs.windfall,
+            monthlyContribution: state.inputs.monthlyContribution,
+            desiredIncome: state.inputs.desiredIncome,
+            withdrawalStrategy: state.inputs.withdrawalStrategy,
+            allocation: allocationResult.allocation,
+            glidePathEnabled: state.inputs.useGlidePath,
+            // Housing params
+            homePurchasePrice: homePurchasePrice,
+            monthlyRent: state.inputs.housing.monthlyRent,
+            propertyTaxRate: state.inputs.housing.propertyTaxRate,
+            annualInsurance: state.inputs.housing.annualInsurance,
+            maintenanceRate: state.inputs.housing.maintenanceRate,
+            monthlyHOA: state.inputs.housing.monthlyHOA,
+            expectedHoldingYears: state.inputs.housing.expectedHoldingYears
+        });
+
+        state.results.housingComparison = housingComparison;
+    }
 }
