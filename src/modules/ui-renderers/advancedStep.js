@@ -39,10 +39,10 @@ export function renderAdvancedStep() {
         <label class="form-label">Near-Term Crash Probability: <span id="crashProbValue">${state.inputs.nearTermCrashProbability}%</span></label>
         <input type="range" class="form-slider" id="nearTermCrashProbability" 
                value="${state.inputs.nearTermCrashProbability}" min="0" max="60" step="5">
-        <div class="slider-labels">
-          <span>0%</span>
-          <span>20% (base)</span>
-          <span>60%</span>
+        <div class="slider-labels" style="position: relative; height: 1.5em; margin-top: 0.5rem;">
+          <span style="position: absolute; left: 0;">0%</span>
+          <span style="position: absolute; left: 33.33%; transform: translateX(-50%); white-space: nowrap;">20% (base)</span>
+          <span style="position: absolute; right: 0;">60%</span>
         </div>
         <span class="form-hint">Probability of a 20%+ equity drawdown in the next 3 years. Higher = more stress testing.</span>
       </div>

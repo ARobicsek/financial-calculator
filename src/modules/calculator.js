@@ -12,36 +12,26 @@ export function runCalculation() {
         resultsContainer.innerHTML = `
         <div class="loading-state" id="resultsLoading">
           <div class="spinner"></div>
-          <h3 style="margin-top: 1.5rem;">Running Monte Carlo Simulations<span id="loadingEllipsis"></span></h3>
+          <h3 style="margin-top: 1.5rem;">Running Monte Carlo Simulations<span class="loading-dots"></span></h3>
         </div>
       `;
-        // Animate ellipsis with JavaScript
-        let dots = 0;
-        const ellipsisEl = document.getElementById('loadingEllipsis');
-        const ellipsisInterval = setInterval(() => {
-            dots = (dots + 1) % 4;
-            if (ellipsisEl) ellipsisEl.textContent = '.'.repeat(dots);
-        }, 400);
-        // Store interval to clear later
-        window._ellipsisInterval = ellipsisInterval;
     }
 
     // Scrape inputs from the dashboard before calculating
     scrapeDashboardInputs();
 
     // Allow UI to update
-    setTimeout(() => {
-        performCalculation();
-        // Clear ellipsis animation
-        if (window._ellipsisInterval) clearInterval(window._ellipsisInterval);
+    setTimeout(async () => {
+        await performCalculation();
+        // Clear ellipsis animation (handled by CSS now)
         updateResultsView(runRecalculation);
-    }, 100);
+    }, 50);
 }
 
-export function runRecalculation() {
+export async function runRecalculation() {
     // Used by inline editor or re-calc interaction
     scrapeDashboardInputs();
-    performCalculation();
+    await performCalculation();
     updateResultsView(runRecalculation);
 }
 
@@ -99,7 +89,7 @@ function scrapeDashboardInputs() {
     state.inputs.nearTermCrashProbability = parseInt(document.getElementById('nearTermCrashProbability')?.value) || 20;
 }
 
-function performCalculation() {
+async function performCalculation() {
     const riskProfile = calculateRiskProfile(state.inputs.riskAnswers);
     const guaranteedIncome = (state.inputs.socialSecurityMonthly * 12) + state.inputs.otherGuaranteedIncome;
 
@@ -130,6 +120,9 @@ function performCalculation() {
         monthlyOwnershipCosts: annualOwnershipCosts / 12,
         homePurchasePrice: homePurchasePrice
     } : null;
+
+    // Yield before heavy lifting
+    await new Promise(resolve => setTimeout(resolve, 10));
 
     // Run Monte Carlo
     const mcResults = runMonteCarloSimulation({
@@ -220,7 +213,11 @@ function performCalculation() {
         });
     }
 
-    const strategyResults = allocationStrategies.map(strategy => {
+    const strategyResults = [];
+    for (const strategy of allocationStrategies) {
+        // Yield before each strategy simulation to allow UI updates
+        await new Promise(resolve => setTimeout(resolve, 10));
+
         // If user has allocated to housing, apply it to ALL strategies
         let strategyAllocation = { ...strategy.allocation };
         if (homeAllocation > 0 && !strategy.isUserAllocation) {
@@ -283,15 +280,15 @@ function performCalculation() {
             iterations: 500
         });
 
-        return {
+        strategyResults.push({
             ...strategy,
             allocation: strategyAllocation,  // Store the updated allocation with home
             originalAllocation: strategy.allocation, // Store original allocation (before home drawn from cash/bonds)
             successRate: result.successRate,
             medianPortfolio: result.portfolioAtRetirement.p50,
             stats: calculatePortfolioStats(strategyAllocation)
-        };
-    });
+        });
+    }
 
     state.results = {
         monte: mcResults,

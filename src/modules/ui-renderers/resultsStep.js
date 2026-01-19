@@ -433,24 +433,59 @@ export function updateHousingComparison(strategyName, allocation) {
   const hasHome = (allocation.residentialRealEstate || 0) > 0;
 
   // Find the selected strategy from pre-computed results
+  // If not found, it might be "Build Your Own"
   const selectedStrategy = state.results.strategyComparison?.find(s => s.name === strategyName);
 
-  if (!selectedStrategy) {
-    console.warn('Strategy not found:', strategyName);
-    return;
+  let withHomeResult, allocationWithoutHome;
+
+  if (selectedStrategy) {
+    // Standard Strategy: Use pre-computed result
+    withHomeResult = {
+      successRate: selectedStrategy.successRate,
+      portfolioAtRetirement: {
+        p50: selectedStrategy.medianPortfolio
+      }
+    };
+    allocationWithoutHome = selectedStrategy.originalAllocation || allocation;
+  } else {
+    // Custom Strategy (Build Your Own)
+    // We must run the "Buy" simulation explicitly if not already available (though selectStrategy usually runs it to get stats)
+    // Using the passed allocation which INCLUDES home
+    const buySim = runMonteCarloSimulation({
+      currentAge: state.inputs.age,
+      retirementAge: state.inputs.retirementAge,
+      endAge: state.inputs.endAge,
+      currentSavings: state.inputs.currentSavings,
+      windfall: state.inputs.windfall,
+      monthlyContribution: state.inputs.monthlyContribution,
+      desiredIncome: state.inputs.desiredIncome,
+      withdrawalStrategy: state.inputs.withdrawalStrategy,
+      allocation: allocation,
+      glidePathEnabled: state.inputs.useGlidePath,
+      housingParams: housingParams,
+      nearTermCrashProbability: state.inputs.nearTermCrashProbability,
+      iterations: 500
+    });
+
+    withHomeResult = {
+      successRate: buySim.successRate,
+      portfolioAtRetirement: {
+        p50: buySim.portfolioAtRetirement.p50
+      }
+    };
+
+    // Construct rent allocation: move home % back to Cash (or Liquid)
+    allocationWithoutHome = { ...allocation };
+    if (hasHome) {
+      const homePct = allocationWithoutHome.residentialRealEstate;
+      allocationWithoutHome.residentialRealEstate = 0;
+      allocationWithoutHome.cashMoneyMarket = (allocationWithoutHome.cashMoneyMarket || 0) + homePct;
+    }
   }
 
-  // Use the pre-computed strategy result for WITH home (BUY scenario)
-  const withHomeResult = {
-    successRate: selectedStrategy.successRate,
-    portfolioAtRetirement: {
-      p50: selectedStrategy.medianPortfolio
-    }
-  };
+  // Run simulation WITHOUT home (RENT scenario)
 
-  // For RENT scenario: use the ORIGINAL strategy allocation (before home was drawn from cash/bonds)
-  // This ensures rent scenario matches what you'd get if you never added home allocation
-  const allocationWithoutHome = selectedStrategy.originalAllocation || allocation;
+
 
   // Run simulation WITHOUT home (RENT scenario)
   const withoutHomeResult = runMonteCarloSimulation({

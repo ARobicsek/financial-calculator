@@ -14,7 +14,8 @@ export function formatAssetName(key) {
         tips: 'TIPS',
         highYieldBonds: 'High Yield',
         reits: 'REITs',
-        cashMoneyMarket: 'Cash/MM'
+        cashMoneyMarket: 'Cash/MM',
+        residentialRealEstate: 'Residential Real Estate'
     };
     return names[key] || key;
 }
