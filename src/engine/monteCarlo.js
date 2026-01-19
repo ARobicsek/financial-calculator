@@ -82,6 +82,7 @@ function generatePortfolioReturn(allocation, returns, volatility) {
 
 /**
  * Run a single simulation path
+ * Now handles home ownership as an asset class with sale after holding period
  */
 function runSingleSimulation(params) {
     const {
@@ -94,22 +95,53 @@ function runSingleSimulation(params) {
         withdrawalStrategy,
         allocation,
         glidePathEnabled,
-        inflationRate
+        inflationRate,
+        // Housing params (optional)
+        housingParams = null
     } = params;
 
     const { expectedReturns, volatility } = MARKET_DATA;
     const monthsToRetirement = (retirementAge - currentAge) * 12;
     const totalMonths = (endAge - currentAge) * 12;
 
-    let portfolio = initialPortfolio;
-    let currentAllocation = { ...allocation };
+    // Check if we have home ownership in the allocation
+    const homeAllocationPct = allocation.residentialRealEstate || 0;
+    const hasHome = homeAllocationPct > 0 && housingParams;
+
+    // Split portfolio between liquid assets and home
+    let homeValue = hasHome ? initialPortfolio * homeAllocationPct : 0;
+    let portfolio = initialPortfolio - homeValue;
+
+    // Create liquid allocation (excluding home from the liquid portion)
+    let liquidAllocation = { ...allocation };
+    if (hasHome) {
+        delete liquidAllocation.residentialRealEstate;
+        // Renormalize liquid allocation to sum to 1
+        const liquidTotal = Object.values(liquidAllocation).reduce((s, v) => s + v, 0);
+        if (liquidTotal > 0) {
+            for (const key of Object.keys(liquidAllocation)) {
+                liquidAllocation[key] = liquidAllocation[key] / liquidTotal;
+            }
+        }
+    }
+    let currentAllocation = { ...liquidAllocation };
+
+    // Housing state
+    const holdingPeriodMonths = hasHome ? (housingParams.holdingPeriodYears || 13) * 12 : 0;
+    const monthlyRent = hasHome ? (housingParams.monthlyRent || 0) : 0;
+    const monthlyOwnershipCosts = hasHome ? (housingParams.monthlyOwnershipCosts || 0) : 0;
+    let hasSoldHome = false;
+    let currentMonthlyRent = 0; // Only applies after selling home
+
     let currentWithdrawal = annualWithdrawal;
     let lastYearReturn = 0;
-    let minWithdrawalRatio = 1; // Track lowest withdrawal ratio vs target
+    let minWithdrawalRatio = 1;
 
     const trajectory = [{
         age: currentAge,
         portfolio: portfolio,
+        homeValue: homeValue,
+        netWorth: portfolio + homeValue,
         phase: 'accumulation'
     }];
 
@@ -121,13 +153,12 @@ function runSingleSimulation(params) {
         // Apply glide path (reduce equities by 1.5% per year in accumulation phase)
         if (glidePathEnabled && month % 12 === 0 && !isRetired) {
             const equityReduction = 0.015;
-            // Reduce equity allocations proportionally
             let totalEquity = (currentAllocation.usLargeCap || 0) +
                 (currentAllocation.usSmallCap || 0) +
                 (currentAllocation.intlDeveloped || 0) +
                 (currentAllocation.emergingMarkets || 0);
 
-            if (totalEquity > 0.20) { // Don't go below 20% equities
+            if (totalEquity > 0.20) {
                 const reductionFactor = (totalEquity - equityReduction) / totalEquity;
                 const bondIncrease = equityReduction;
 
@@ -139,22 +170,53 @@ function runSingleSimulation(params) {
             }
         }
 
-        // Generate monthly return
+        // Generate monthly return for liquid portfolio
         const monthlyReturn = generatePortfolioReturn(currentAllocation, expectedReturns, volatility);
-
-        // Apply return
         portfolio *= (1 + monthlyReturn);
+
+        // Handle home appreciation if still owned
+        if (hasHome && !hasSoldHome && homeValue > 0) {
+            const homeReturn = generateMonthlyReturn(
+                expectedReturns.residentialRealEstate || 0.035,
+                volatility.residentialRealEstate || 0.08,
+                false // Use normal distribution for real estate
+            );
+            homeValue *= (1 + homeReturn);
+
+            // Check if it's time to sell (after holding period)
+            if (month >= holdingPeriodMonths) {
+                const sellingCosts = 0.06; // 6% selling costs
+                const netProceeds = homeValue * (1 - sellingCosts);
+                portfolio += netProceeds;
+                homeValue = 0;
+                hasSoldHome = true;
+
+                // Start paying rent (inflation-adjusted to this point)
+                const yearsOwned = holdingPeriodMonths / 12;
+                currentMonthlyRent = monthlyRent * Math.pow(1 + inflationRate, yearsOwned);
+            }
+        }
 
         // Apply contribution or withdrawal
         if (!isRetired) {
             // Accumulation phase: add contributions
             portfolio += monthlyContribution;
+
+            // If homeowner, add rent savings minus ownership costs
+            if (hasHome && !hasSoldHome) {
+                const netMonthlySavings = monthlyRent - monthlyOwnershipCosts;
+                portfolio += netMonthlySavings;
+            }
         } else {
             // Distribution phase: apply withdrawal strategy
-            const monthlyWithdrawal = currentWithdrawal / 12;
+            let monthlyWithdrawal = currentWithdrawal / 12;
+
+            // If sold home, need to add rent to expenses
+            if (hasSoldHome) {
+                monthlyWithdrawal += currentMonthlyRent;
+            }
 
             if (withdrawalStrategy === 'guardrails' && month % 12 === 0) {
-                // Annual adjustment based on guardrails
                 currentWithdrawal = applyGuardrails(
                     portfolio,
                     currentWithdrawal,
@@ -163,8 +225,10 @@ function runSingleSimulation(params) {
                     endAge - age
                 );
             } else if (withdrawalStrategy === 'fixed' && month % 12 === 0) {
-                // Fixed: just adjust for inflation
                 currentWithdrawal *= (1 + inflationRate);
+                if (hasSoldHome) {
+                    currentMonthlyRent *= (1 + inflationRate);
+                }
             }
 
             portfolio -= monthlyWithdrawal;
@@ -172,8 +236,7 @@ function runSingleSimulation(params) {
 
         // Track annual return for guardrails
         if (month % 12 === 0) {
-            lastYearReturn = monthlyReturn * 12; // Approximation
-            // Track minimum withdrawal ratio (how much income was cut)
+            lastYearReturn = monthlyReturn * 12;
             if (isRetired && annualWithdrawal > 0) {
                 const withdrawalRatio = currentWithdrawal / annualWithdrawal;
                 minWithdrawalRatio = Math.min(minWithdrawalRatio, withdrawalRatio);
@@ -185,6 +248,8 @@ function runSingleSimulation(params) {
             trajectory.push({
                 age: Math.round(age),
                 portfolio: Math.max(0, portfolio),
+                homeValue: homeValue,
+                netWorth: Math.max(0, portfolio) + homeValue,
                 phase: isRetired ? 'distribution' : 'accumulation'
             });
         }
@@ -192,12 +257,13 @@ function runSingleSimulation(params) {
         // Check for portfolio depletion
         if (portfolio <= 0) {
             portfolio = 0;
-            // Fill remaining trajectory with zeros
             const remainingYears = Math.ceil((totalMonths - month) / 12);
             for (let y = 0; y < remainingYears; y++) {
                 trajectory.push({
                     age: Math.round(age + y + 1),
                     portfolio: 0,
+                    homeValue: homeValue,
+                    netWorth: homeValue,
                     phase: 'depleted'
                 });
             }
@@ -205,18 +271,21 @@ function runSingleSimulation(params) {
         }
     }
 
-    // Consider "failed" if portfolio depleted OR income was ever cut below target
     const incomeCut = minWithdrawalRatio < 1.0;
 
     return {
         trajectory,
         finalPortfolio: portfolio,
+        finalHomeValue: homeValue,
+        finalNetWorth: portfolio + homeValue,
         depleted: portfolio <= 0,
         incomeCut,
         minWithdrawalRatio,
-        depletedAge: portfolio <= 0 ? trajectory.find(t => t.portfolio === 0)?.age : null
+        depletedAge: portfolio <= 0 ? trajectory.find(t => t.portfolio === 0)?.age : null,
+        hasSoldHome
     };
 }
+
 
 /**
  * Apply Guardrails withdrawal strategy (modified Guyton-Klinger)
@@ -271,7 +340,8 @@ export function runMonteCarloSimulation(params, iterations = 1000) {
         withdrawalRate = 0.04,
         withdrawalStrategy = 'guardrails', // 'fixed' or 'guardrails'
         allocation = {},
-        glidePathEnabled = true
+        glidePathEnabled = true,
+        housingParams = null  // Optional: { holdingPeriodYears, monthlyRent, monthlyOwnershipCosts }
     } = params;
 
     const initialPortfolio = currentSavings + windfall;
@@ -297,7 +367,8 @@ export function runMonteCarloSimulation(params, iterations = 1000) {
         withdrawalStrategy,
         allocation: normalizeAllocation(allocation),
         glidePathEnabled,
-        inflationRate
+        inflationRate,
+        housingParams  // Pass housing params for home ownership mechanics
     };
 
     // Run simulations

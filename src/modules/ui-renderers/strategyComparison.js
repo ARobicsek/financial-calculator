@@ -358,7 +358,8 @@ function renderAllocationBreakdown(allocation) {
     { key: 'emergingMarkets', name: 'Emerging Markets', tickers: 'VWO, IEMG (China, India, Brazil, etc.)' },
     { key: 'usAggregateBonds', name: 'US Bonds (Aggregate)', tickers: 'BND, AGG, investment-grade bonds' },
     { key: 'tips', name: 'TIPS / I-Bonds', tickers: 'SCHP, VTIP, inflation-protected' },
-    { key: 'cashMoneyMarket', name: 'Cash / Money Market', tickers: 'VMFXX, savings, CDs' }
+    { key: 'cashMoneyMarket', name: 'Cash / Money Market', tickers: 'VMFXX, savings, CDs' },
+    { key: 'residentialRealEstate', name: '🏠 Primary Home', tickers: 'Home ownership - eliminates rent' }
   ];
 
   return `

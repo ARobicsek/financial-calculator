@@ -90,6 +90,27 @@ function attachDashboardListeners() {
       if (state.inputs.currentAllocation.hasOwnProperty(key)) {
         state.inputs.currentAllocation[key] = parseInt(e.target.value) || 0;
       }
+
+      // Recalculate and update total allocation display
+      const total = Object.values(state.inputs.currentAllocation).reduce((sum, v) => sum + v, 0);
+      const isValid = total === 100;
+      const totalValueEl = document.querySelector('.allocation-summary .total-value');
+      const totalStatusEl = document.querySelector('.allocation-summary .total-status');
+      const summaryEl = document.querySelector('.allocation-summary');
+
+      if (totalValueEl) totalValueEl.textContent = `${total}%`;
+      if (totalStatusEl) {
+        totalStatusEl.textContent = isValid ? '✓ Perfect' : `${total < 100 ? 'Add ' + (100 - total) + '%' : 'Remove ' + (total - 100) + '%'}`;
+      }
+      if (summaryEl) {
+        summaryEl.classList.toggle('valid', isValid);
+        summaryEl.classList.toggle('invalid', !isValid);
+      }
+
+      // Update Primary Home value hint in real-time
+      if (key === 'residentialRealEstate') {
+        updateHomeValueHint(parseInt(e.target.value) || 0);
+      }
     });
 
     // Only re-render housing config on slider release (change event)
@@ -133,7 +154,6 @@ function attachDashboardListeners() {
   initHousingInputListeners();
 }
 
-// Helper to attach portfolio slider listeners (for re-renders)
 function attachPortfolioSliderListeners() {
   document.querySelectorAll('.allocation-slider').forEach(slider => {
     // Update display value in real-time as user drags
@@ -145,6 +165,27 @@ function attachPortfolioSliderListeners() {
       // Update state immediately
       if (state.inputs.currentAllocation.hasOwnProperty(key)) {
         state.inputs.currentAllocation[key] = parseInt(e.target.value) || 0;
+      }
+
+      // Recalculate and update total allocation display
+      const total = Object.values(state.inputs.currentAllocation).reduce((sum, v) => sum + v, 0);
+      const isValid = total === 100;
+      const totalValueEl = document.querySelector('.allocation-summary .total-value');
+      const totalStatusEl = document.querySelector('.allocation-summary .total-status');
+      const summaryEl = document.querySelector('.allocation-summary');
+
+      if (totalValueEl) totalValueEl.textContent = `${total}%`;
+      if (totalStatusEl) {
+        totalStatusEl.textContent = isValid ? '✓ Perfect' : `${total < 100 ? 'Add ' + (100 - total) + '%' : 'Remove ' + (total - 100) + '%'}`;
+      }
+      if (summaryEl) {
+        summaryEl.classList.toggle('valid', isValid);
+        summaryEl.classList.toggle('invalid', !isValid);
+      }
+
+      // Update Primary Home value hint in real-time
+      if (key === 'residentialRealEstate') {
+        updateHomeValueHint(parseInt(e.target.value) || 0);
       }
     });
 
@@ -162,6 +203,10 @@ function attachPortfolioSliderListeners() {
 }
 
 function refreshPortfolioCard() {
+  // Update state from input fields BEFORE re-rendering (so home value is calculated correctly)
+  state.inputs.currentSavings = parseFloat(document.getElementById('currentSavings')?.value) || state.inputs.currentSavings;
+  state.inputs.windfall = parseFloat(document.getElementById('windfall')?.value) || state.inputs.windfall;
+
   const portfolioCard = document.getElementById('card-portfolio');
   if (portfolioCard) {
     const cardContent = portfolioCard.querySelector('.card-content');
@@ -192,3 +237,25 @@ function initHousingInputListeners() {
   });
 }
 
+// Update Primary Home value hint in real-time based on current input values
+function updateHomeValueHint(homePercentage) {
+  // Read current values from input fields (not stale state)
+  const currentSavings = parseFloat(document.getElementById('currentSavings')?.value) || state.inputs.currentSavings;
+  const windfall = parseFloat(document.getElementById('windfall')?.value) || state.inputs.windfall;
+  const totalPortfolio = currentSavings + windfall;
+  const homeValue = (homePercentage / 100) * totalPortfolio;
+
+  // Find the Primary Home slider's hint element
+  const homeSlider = document.getElementById('residentialRealEstateSlider');
+  if (homeSlider) {
+    const hintEl = homeSlider.closest('.allocation-item')?.querySelector('.form-hint');
+    if (hintEl) {
+      const baseHint = 'Buy a home instead of renting';
+      if (homePercentage > 0 && homeValue > 0) {
+        hintEl.textContent = `${baseHint} = $${(homeValue / 1000000).toFixed(2)}M home`;
+      } else {
+        hintEl.textContent = baseHint;
+      }
+    }
+  }
+}

@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { runMonteCarloSimulation, runHousingComparisonSimulation } from '../engine/monteCarlo.js';
+import { runMonteCarloSimulation } from '../engine/monteCarlo.js';
 import { calculateAllocation, calculatePortfolioStats } from '../engine/assetAllocation.js';
 import { calculateRiskProfile } from '../components/RiskQuestionnaire.js';
 import { updateResultsView } from './ui-renderers/resultsStep.js';
@@ -100,6 +100,25 @@ function performCalculation() {
         incomeGoal: state.inputs.desiredIncome
     });
 
+    // Build housing params if user has home allocation
+    const homeAllocation = state.inputs.currentAllocation.residentialRealEstate || 0;
+    const totalPortfolio = state.inputs.currentSavings + state.inputs.windfall;
+    const homePurchasePrice = (homeAllocation / 100) * totalPortfolio;
+
+    // Calculate monthly ownership costs
+    const annualOwnershipCosts = homeAllocation > 0 ?
+        (homePurchasePrice * state.inputs.housing.propertyTaxRate) +
+        state.inputs.housing.annualInsurance +
+        (homePurchasePrice * state.inputs.housing.maintenanceRate) +
+        (state.inputs.housing.monthlyHOA * 12) : 0;
+
+    const housingParams = homeAllocation > 0 ? {
+        holdingPeriodYears: state.inputs.housing.expectedHoldingYears || 13,
+        monthlyRent: state.inputs.housing.monthlyRent || 0,
+        monthlyOwnershipCosts: annualOwnershipCosts / 12,
+        homePurchasePrice: homePurchasePrice
+    } : null;
+
     // Run Monte Carlo
     const mcResults = runMonteCarloSimulation({
         currentAge: state.inputs.age,
@@ -111,7 +130,8 @@ function performCalculation() {
         desiredIncome: state.inputs.desiredIncome,
         withdrawalStrategy: state.inputs.withdrawalStrategy,
         allocation: allocationResult.allocation,
-        glidePathEnabled: state.inputs.useGlidePath
+        glidePathEnabled: state.inputs.useGlidePath,
+        housingParams: housingParams
     });
 
     // Define allocation strategies
@@ -179,7 +199,8 @@ function performCalculation() {
                 emergingMarkets: userAlloc.emergingMarkets / 100,
                 usAggregateBonds: userAlloc.usBonds / 100,
                 tips: userAlloc.tips / 100,
-                cashMoneyMarket: userAlloc.cashMoneyMarket / 100
+                cashMoneyMarket: userAlloc.cashMoneyMarket / 100,
+                residentialRealEstate: userAlloc.residentialRealEstate / 100
             },
             icon: '📊',
             isUserAllocation: true
@@ -187,6 +208,10 @@ function performCalculation() {
     }
 
     const strategyResults = allocationStrategies.map(strategy => {
+        // Only pass housingParams if this strategy has home allocation AND user has home params
+        const strategyHasHome = (strategy.allocation.residentialRealEstate || 0) > 0;
+        const strategyHousingParams = strategyHasHome ? housingParams : null;
+
         const result = runMonteCarloSimulation({
             currentAge: state.inputs.age,
             retirementAge: state.inputs.retirementAge,
@@ -198,6 +223,7 @@ function performCalculation() {
             withdrawalStrategy: state.inputs.withdrawalStrategy,
             allocation: strategy.allocation,
             glidePathEnabled: state.inputs.useGlidePath,
+            housingParams: strategyHousingParams,
             iterations: 500
         });
 
@@ -214,36 +240,8 @@ function performCalculation() {
         allocation: allocationResult,
         riskProfile,
         portfolioStats: calculatePortfolioStats(allocationResult.allocation),
-        strategyComparison: strategyResults
+        strategyComparison: strategyResults,
+        // Store housing params for Rent vs Buy card (will run comparison on-demand)
+        housingParams: housingParams
     };
-
-    // Run housing comparison if user has allocated to residential real estate
-    const homeAllocation = state.inputs.currentAllocation.residentialRealEstate || 0;
-    if (homeAllocation > 0) {
-        const totalPortfolio = state.inputs.currentSavings + state.inputs.windfall;
-        const homePurchasePrice = (homeAllocation / 100) * totalPortfolio;
-
-        const housingComparison = runHousingComparisonSimulation({
-            currentAge: state.inputs.age,
-            retirementAge: state.inputs.retirementAge,
-            endAge: state.inputs.endAge,
-            currentSavings: state.inputs.currentSavings,
-            windfall: state.inputs.windfall,
-            monthlyContribution: state.inputs.monthlyContribution,
-            desiredIncome: state.inputs.desiredIncome,
-            withdrawalStrategy: state.inputs.withdrawalStrategy,
-            allocation: allocationResult.allocation,
-            glidePathEnabled: state.inputs.useGlidePath,
-            // Housing params
-            homePurchasePrice: homePurchasePrice,
-            monthlyRent: state.inputs.housing.monthlyRent,
-            propertyTaxRate: state.inputs.housing.propertyTaxRate,
-            annualInsurance: state.inputs.housing.annualInsurance,
-            maintenanceRate: state.inputs.housing.maintenanceRate,
-            monthlyHOA: state.inputs.housing.monthlyHOA,
-            expectedHoldingYears: state.inputs.housing.expectedHoldingYears
-        });
-
-        state.results.housingComparison = housingComparison;
-    }
 }
