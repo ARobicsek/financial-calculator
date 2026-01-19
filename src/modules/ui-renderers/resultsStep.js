@@ -1,10 +1,12 @@
 import { state } from '../state.js';
 // import { renderInlineEditor, attachInlineEditorListeners } from './inlineEditor.js'; // Disabling inline editor in dashboard mode
-import { renderStrategyComparison, attachCustomCardListeners } from './strategyComparison.js';
+import { renderStrategyComparison, attachCustomCardListeners, customCardAllocation } from './strategyComparison.js';
 import { formatNumber, formatRiskProfile } from '../utils/formatting.js';
 import { showMethodology, toggleSidebar, setupAssumptionsSidebar } from './sidebar.js';
 import { FUND_RECOMMENDATIONS } from '../../data/marketData.js';
 import { Chart } from 'chart.js';
+import { runMonteCarloSimulation } from '../../engine/monteCarlo.js';
+import { calculatePortfolioStats } from '../../engine/assetAllocation.js';
 
 export function updateResultsView(recalculateCallback) {
   // In Dashboard mode, we target the #resultsContainer directly.
@@ -109,24 +111,57 @@ function attachStrategyCardListeners() {
       if (e.target.tagName === 'INPUT') return;
 
       const strategyName = card.querySelector('h4')?.textContent;
-      if (strategyName && strategyName !== 'Build Your Own') {
-        selectStrategy(strategyName);
+      if (strategyName) {
+        if (strategyName === 'Build Your Own') {
+          // For Build Your Own, pass the current custom allocation (converted to decimals)
+          const allocation = {};
+          for (const [key, value] of Object.entries(customCardAllocation)) {
+            allocation[key] = value / 100;
+          }
+          selectStrategy(strategyName, allocation);
+        } else {
+          selectStrategy(strategyName);
+        }
       }
     });
   });
 }
 
-export function selectStrategy(strategyName) {
+export function selectStrategy(strategyName, customAllocation = null) {
   state.selectedStrategy = strategyName;
 
   // Get strategy data
-  const { strategyComparison, monte } = state.results;
-  const selectedStrategy = strategyComparison?.find(s => s.name === strategyName);
+  const { strategyComparison } = state.results;
+  let selectedStrategy = strategyComparison?.find(s => s.name === strategyName);
 
-  if (!selectedStrategy) return;
+  // For Build Your Own, use current custom allocation
+  let allocation;
+  if (strategyName === 'Build Your Own' && customAllocation) {
+    allocation = customAllocation;
+  } else if (selectedStrategy) {
+    allocation = selectedStrategy.allocation;
+  } else {
+    return;
+  }
+
+  // Run a fresh simulation to get trajectory data for the chart
+  const simResult = runMonteCarloSimulation({
+    currentAge: state.inputs.age,
+    retirementAge: state.inputs.retirementAge,
+    endAge: state.inputs.endAge,
+    currentSavings: state.inputs.currentSavings,
+    windfall: state.inputs.windfall,
+    monthlyContribution: state.inputs.monthlyContribution,
+    desiredIncome: state.inputs.desiredIncome,
+    withdrawalStrategy: state.inputs.withdrawalStrategy,
+    allocation: allocation,
+    glidePathEnabled: state.inputs.useGlidePath,
+    iterations: 500
+  });
 
   // Update summary cards
-  const successPercent = (selectedStrategy.successRate * 100).toFixed(0);
+  const successPercent = (simResult.successRate * 100).toFixed(0);
+  const stats = selectedStrategy?.stats || calculatePortfolioStats(allocation);
 
   document.querySelector('.percent').textContent = successPercent + '%';
   document.querySelector('.success-rate').innerHTML = `
@@ -139,27 +174,33 @@ export function selectStrategy(strategyName) {
   // Update result cards
   const resultCards = document.querySelectorAll('.result-card');
   if (resultCards[0]) {
-    resultCards[0].querySelector('.value').textContent = '$' + formatNumber(selectedStrategy.medianPortfolio);
+    resultCards[0].querySelector('.value').textContent = '$' + formatNumber(simResult.portfolioAtRetirement.p50);
   }
   if (resultCards[2]) {
-    resultCards[2].querySelector('.value').textContent = selectedStrategy.stats.expectedReturnFormatted;
-    resultCards[2].querySelector('.subtext').textContent = 'Volatility: ' + selectedStrategy.stats.volatilityFormatted;
+    resultCards[2].querySelector('.value').textContent = stats.expectedReturnFormatted;
+    resultCards[2].querySelector('.subtext').textContent = 'Volatility: ' + stats.volatilityFormatted;
   }
 
   // Update visual selection on cards
   document.querySelectorAll('.strategy-card').forEach(card => {
     card.classList.remove('selected');
-    if (card.querySelector('h4')?.textContent === strategyName) {
+    const cardTitle = card.querySelector('h4')?.textContent;
+    if (cardTitle === strategyName) {
       card.classList.add('selected');
     }
   });
 
-  // Redraw fan chart with selected strategy's trajectory (if available)
-  // For now, we keep the original chart since we'd need to re-run simulation for accurate trajectories
+  // Redraw fan chart with new trajectory data
+  state.results.monte.trajectoryByAge = simResult.trajectoryByAge;
+  renderFanChartWithData(simResult.trajectoryByAge);
 }
 
 function renderFanChart() {
   const { trajectoryByAge } = state.results.monte;
+  renderFanChartWithData(trajectoryByAge);
+}
+
+function renderFanChartWithData(trajectoryByAge) {
   const ages = Object.keys(trajectoryByAge).map(Number);
 
   const ctx = document.getElementById('fanChart').getContext('2d');
