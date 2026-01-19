@@ -5,12 +5,14 @@
 2. [Monte Carlo Simulation Engine](#monte-carlo-simulation-engine)
 3. [Market Assumptions and Data Sources](#market-assumptions-and-data-sources)
 4. [Risk-Based Asset Allocation](#risk-based-asset-allocation)
-5. [Portfolio Growth Calculations](#portfolio-growth-calculations)
-6. [Withdrawal Strategies](#withdrawal-strategies)
-7. [Glide Path Implementation](#glide-path-implementation)
-8. [Success Metrics and Statistical Analysis](#success-metrics-and-statistical-analysis)
-9. [Tax Optimization](#tax-optimization)
-10. [Limitations and Disclaimers](#limitations-and-disclaimers)
+5. [Home Ownership Model](#home-ownership-model)
+6. [Portfolio Growth Calculations](#portfolio-growth-calculations)
+7. [Withdrawal Strategies](#withdrawal-strategies)
+8. [Glide Path Implementation](#glide-path-implementation)
+9. [Near-Term Crash Modeling](#near-term-crash-modeling)
+10. [Strategy Comparison](#strategy-comparison)
+11. [Success Metrics and Statistical Analysis](#success-metrics-and-statistical-analysis)
+12. [Limitations and Disclaimers](#limitations-and-disclaimers)
 
 ---
 
@@ -24,6 +26,7 @@ The calculator embodies several key principles:
 - **Probabilistic thinking**: Success rates rather than guaranteed outcomes
 - **Sequence-of-returns risk**: Monthly time steps capture the impact of return timing
 - **Conservative assumptions**: Uses current market valuations, not historical averages
+- **Comprehensive modeling**: Includes home ownership as a distinct asset class
 - **Transparency**: All assumptions, formulas, and limitations are documented
 
 ---
@@ -56,9 +59,8 @@ Uses the **Box-Muller transform** to convert uniform random numbers into standar
 
 ```
 U₁, U₂ ~ Uniform(0,1)
-Z₁ = √(-2 ln U₁) × cos(2πU₂)
-Z₂ = √(-2 ln U₁) × sin(2πU₂)
-where Z₁, Z₂ ~ Normal(0,1)
+Z = √(-2 ln U₁) × cos(2πU₂)
+where Z ~ Normal(0,1)
 ```
 
 #### Step 2: Create Correlated Returns
@@ -116,19 +118,22 @@ Return = μ + σ × Z
 Each month:
 1. **Apply returns**: `Balance = Balance × (1 + weighted_return)`
 2. **Add contribution**: `Balance = Balance + monthly_contribution`
+3. **Home ownership adjustment** (if applicable): Add rent savings minus ownership costs
 
 Each year:
-3. **Apply glide path** (if enabled): Reduce equity allocation by schedule
+4. **Apply glide path** (if enabled): Reduce equity allocation by schedule
+5. **Inflate ownership costs**: Property tax, insurance, maintenance increase by 3% annually
 
 #### Distribution Phase (Retirement → End Age)
 
 Each month:
 1. **Apply returns**: `Balance = Balance × (1 + weighted_return)`
 2. **Subtract withdrawal**: `Balance = Balance - monthly_withdrawal`
+3. **Add rent expense** (if home was sold): Include inflation-adjusted rent
 
 Each year:
-3. **Adjust withdrawal** per strategy (Guardrails, Fixed, etc.)
-4. **Apply glide path** (if enabled): Continue reducing equity allocation
+4. **Adjust withdrawal** per strategy (Guardrails, Fixed, etc.)
+5. **Apply glide path** (if enabled): Continue reducing equity allocation
 
 ### Single Simulation Termination
 
@@ -158,6 +163,8 @@ A simulation path ends in one of three states:
 | High-Yield Bonds | 5.8% | 10% | Credit spread over investment grade |
 | **Cash** |
 | Money Market | 2.8% | 1% | Fed funds rate (3.50-3.75% range midpoint) |
+| **Real Estate** |
+| Residential Real Estate | 3.5% | 8% | Historical home appreciation + current market |
 
 ### Economic Assumptions
 
@@ -231,9 +238,9 @@ Users complete an **8-question assessment** measuring:
 #### Base Equity Allocation
 
 ```
-Base Equity % = 10% + (Risk Score - 1) × 10%
+Base Equity % = 10% + (Risk Score / 40) × 80%
 
-Example: Score of 30 → 10% + (30-1)×10% = 300% (but will be clamped)
+Example: Score of 30 → 10% + (30/40)×80% = 70%
 ```
 
 #### Adjustment Factor 1: Time Horizon
@@ -254,8 +261,6 @@ If Years < 5:                Multiplier = 0.50× (reduce 50%)
 Your earning power is an asset. Stable income allows more portfolio risk:
 
 ```
-Adjustment = Base × (1 - Years to Retirement / 40)
-
 Job Stability Level     | Adjustment
 ------------------------|------------
 Very Stable             | +10% × (years remaining / 40)
@@ -299,32 +304,15 @@ Final Equity % = Base Equity %
 Constrained to: [10%, 95%]
 ```
 
-**Example Calculation**:
-```
-Risk Score: 30
-Years to Retirement: 13
-Job Stability: Stable
-Guaranteed Income: $50K (50% of $100K goal)
-
-Base = 10% + (30-1)×10% = 300% (pre-clamp)
-Actually, formula is: 10% + (score/40)×80% → ~70% for score of 30
-
-After time horizon (13 years → 0.90×): 70% × 0.90 = 63%
-After job stability (+5% × (13/40)): 63% + 1.6% = 64.6%
-After guaranteed income boost: 64.6% + 7.5% = 72.1%
-
-Final: 72.1% Equities, 27.9% Bonds
-```
-
 ### Equity Sub-Allocation by Risk Profile
 
 The equity portion is divided across geographies based on risk tolerance:
 
 | Risk Level | US Large Cap | US Small Cap | Intl Developed | Emerging Markets |
 |------------|--------------|--------------|----------------|------------------|
-| **Conservative** (score ≤ 3) | 70% | 5% | 20% | 5% |
-| **Moderate** (score 4-6) | 55% | 10% | 25% | 10% |
-| **Aggressive** (score 7+) | 45% | 15% | 25% | 15% |
+| **Conservative** (score ≤ 20) | 70% | 5% | 20% | 5% |
+| **Moderate** (score 21-30) | 55% | 10% | 25% | 10% |
+| **Aggressive** (score 31+) | 45% | 15% | 25% | 15% |
 
 **Rationale**:
 - Conservative portfolios overweight large-cap US (lower volatility)
@@ -342,6 +330,122 @@ The bond/cash portion uses a standard mix:
 | Cash/Money Market | 15% | Liquidity, stability |
 
 **High-Yield Bonds** only appear in specialized strategies (Income-Focused), not the primary Risk-Matched allocation, to maintain quality.
+
+---
+
+## Home Ownership Model
+
+The calculator treats **Primary Home** as a distinct asset class with comprehensive modeling of purchase, ownership, and sale.
+
+### Key Features
+
+1. **Unified Treatment**: Home is an asset class across all strategies
+2. **Equity Tracking**: Monitors home value appreciation separate from liquid portfolio
+3. **Realistic Funding**: Home purchase reduces liquid portfolio by purchase price
+4. **Holding Period**: Configurable from 1-20 years or "Never" (keep forever)
+5. **Sale Mechanics**: 6% selling costs, proceeds reinvested in liquid portfolio
+6. **Net Worth Tracking**: Portfolio charts display total net worth (liquid + home equity)
+
+### Home Purchase
+
+When user allocates X% to "Primary Home":
+```
+Home Purchase Price = Total Portfolio × (X% / 100)
+Liquid Portfolio = Total Portfolio - Home Purchase Price
+```
+
+### Realistic Home Funding for Strategy Comparison
+
+For non-user strategies, home funds are drawn realistically (not pro-rata):
+1. **Cash first**: Draw from money market
+2. **Bonds second**: Draw from aggregate bonds
+3. **TIPS third**: Draw from inflation-protected bonds
+4. **Equities last**: Only if home allocation exceeds all safe assets
+
+**Example**:
+```
+Strategy: Income-Focused (before home)
+- US Large Cap: 30%
+- Bonds: 30%
+- TIPS: 15%
+- Cash: 5%
+- Total: 80% + 20% other
+
+User wants 25% in Primary Home
+
+Funding sequence:
+1. Take 5% from Cash → Cash now 0%
+2. Take 15% from TIPS → TIPS now 0%
+3. Take 5% from Bonds → Bonds now 25%
+4. Add 25% Primary Home
+
+Final allocation:
+- US Large Cap: 30%
+- Bonds: 25% (reduced from 30%)
+- TIPS: 0% (reduced from 15%)
+- Cash: 0% (reduced from 5%)
+- Primary Home: 25%
+- Other: 20%
+```
+
+### Ownership Costs
+
+Monthly ownership costs include:
+```
+Monthly Ownership Costs =
+  (Home Price × Property Tax Rate) / 12 +
+  (Annual Insurance) / 12 +
+  (Home Price × Maintenance Rate) / 12 +
+  (Annual Maintenance) / 12
+
+Where defaults:
+  Property Tax Rate = 1.2% annually
+  Annual Insurance = $8,000
+  Maintenance Rate = 1.0% annually
+  Annual Maintenance = $5,000
+```
+
+**Inflation adjustment**: All ownership costs increase by 3% annually (conservative estimate above general inflation).
+
+### Accumulation Phase with Home
+
+Each month before retirement:
+```
+Net Monthly Benefit = Monthly Rent Savings - Monthly Ownership Costs
+Portfolio += Monthly Contribution + Net Monthly Benefit
+```
+
+**Rent Savings**: The monthly rent you would have paid if renting instead of owning.
+
+### Home Sale
+
+After holding period (or at age 999+ for "Never" option):
+```
+Selling Costs = 6% of Home Value
+Net Proceeds = Home Value × (1 - 0.06)
+Liquid Portfolio += Net Proceeds
+Home Value = 0
+```
+
+After sale, if still alive:
+```
+Monthly Rent = Original Rent × (1 + inflation)^years_owned
+This rent is added to monthly expenses in retirement
+```
+
+### Home Appreciation
+
+Home value grows each month using:
+```
+Monthly Return = generateHomeReturn(inflationFactor, equityFactor)
+
+Correlation structure:
+- 60% correlated with inflation
+- 20% correlated with equities
+- 20% idiosyncratic (local market factors)
+```
+
+Expected annual appreciation: **3.5%** with **8% volatility** (normal distribution).
 
 ---
 
@@ -387,20 +491,35 @@ For each month from now to end age:
   # Generate random return for this month
   monthly_return = generate_correlated_return()
 
-  # Apply return
-  balance = balance × (1 + monthly_return)
+  # Apply return to liquid portfolio
+  liquid_portfolio = liquid_portfolio × (1 + monthly_return)
+
+  # Apply return to home (if owned)
+  if owns_home and not sold_home:
+    home_return = generate_home_return()
+    home_value = home_value × (1 + home_return)
+
+  # Check if it's time to sell home
+  if month == holding_period_months:
+    sell_home()
 
   # Cash flow
   if in_accumulation_phase:
-    balance = balance + monthly_contribution
+    liquid_portfolio += monthly_contribution
+    if owns_home and not sold_home:
+      liquid_portfolio += (rent_savings - ownership_costs)
   else:
-    balance = balance - monthly_withdrawal
+    withdrawal = current_withdrawal / 12
+    if sold_home:
+      withdrawal += monthly_rent  # Add rent expense
+    liquid_portfolio -= withdrawal
 
   # Record balance
-  portfolio_history.append(balance)
+  net_worth = liquid_portfolio + home_value
+  trajectory.append(net_worth)
 
   # Check if depleted
-  if balance < 0:
+  if liquid_portfolio < 0:
     mark_as_failed()
     break
 ```
@@ -426,20 +545,6 @@ Step 2: Use inflation-adjusted income OR 4% rule (whichever is lower)
     Inflation_Adjusted_Income,
     Projected_Portfolio × 0.04
   )
-```
-
-**Example**:
-- Desired Income: $100,000 (in today's dollars)
-- Years to Retirement: 13
-- Inflation: 2.4%
-- Projected Portfolio: $2,479,200
-
-```
-Inflation_Adjusted = $100,000 × (1.024)^13 = $136,600
-
-4% Rule = $2,479,200 × 0.04 = $99,168
-
-Initial_Withdrawal = Min($136,600, $99,168) = $99,168/year
 ```
 
 ### Strategy 1: Guardrails (Modified Guyton-Klinger)
@@ -485,17 +590,6 @@ Else:
   Withdrawal = Withdrawal × (1 + inflation)
 ```
 
-**Example Sequence**:
-```
-Year 1: Start with $100,000 withdrawal from $2.5M portfolio (4.0% rate)
-Year 2: Portfolio grows to $2.7M → Rate = 3.7% (within guards) → Inflate: $102,400
-Year 3: Market crash, portfolio drops to $2.0M → Rate = 5.1% (within guards)
-        But return was negative → Skip inflation → Keep at $102,400
-Year 4: Portfolio recovers to $2.2M → Rate = 4.7% → Inflate: $104,858
-Year 5: Portfolio soars to $3.0M → Rate = 3.5% (below 3.6% guard!)
-        → Increase 10%: $115,344
-```
-
 **Advantages**:
 - Flexibility to capture portfolio gains
 - Automatic spending cuts when needed
@@ -516,15 +610,6 @@ Annual Adjustment:
 
 **No adjustments** based on portfolio performance.
 
-**Example Sequence**:
-```
-Year 1: $100,000
-Year 2: $102,400 (2.4% inflation)
-Year 3: $104,857
-Year 4: $107,374
-Year 5: $109,951
-```
-
 **Advantages**:
 - Predictable, stable income
 - Simplicity
@@ -543,10 +628,9 @@ A **glide path** is a predetermined schedule to reduce equity exposure as you ag
 
 ### Glide Path Schedule
 
-#### Phase 1: Pre-Retirement (Final 15 Years)
+#### Phase 1: Pre-Retirement (Ongoing)
 
 ```
-Starting Point: 15 years before retirement
 Reduction Rate: 1.5 percentage points per year
 Floor: 20% equities
 
@@ -561,7 +645,6 @@ Example:
 #### Phase 2: Early Retirement (First 7 Years)
 
 ```
-Starting Point: At retirement
 Reduction Rate: 3 percentage points per year
 Floor: 30% equities
 
@@ -580,13 +663,13 @@ Example:
 ### Mathematical Formula
 
 ```
-Equity Allocation at Age t:
+Equity Allocation at Year t:
 
-If in final 15 years before retirement:
-  Equity% = Max(20%, Base_Equity% - 1.5% × years_into_glidepath)
+If before retirement:
+  Equity% = Max(20%, Current_Equity% - 1.5%)
 
 If in first 7 years of retirement:
-  Equity% = Max(30%, Retirement_Start_Equity% - 3% × years_retired)
+  Equity% = Max(30%, Current_Equity% - 3%)
 
 If after 7 years of retirement:
   Equity% = 30%
@@ -606,19 +689,101 @@ If after 7 years of retirement:
    - Inflation protection
    - Legacy/estate goals
 
-### Comparison with No Glide Path
+---
 
-**With Glide Path**:
-- ✅ Reduces volatility when you can least afford it
-- ✅ Protects against sequence-of-returns risk
-- ✅ Aligns with target-date fund best practices
-- ❌ Gives up upside potential if markets boom late in life
+## Near-Term Crash Modeling
 
-**Without Glide Path**:
-- ✅ Maintains higher expected returns throughout
-- ✅ Maximum growth potential in bull markets
-- ❌ Higher volatility in retirement (when withdrawing)
-- ❌ Greater sequence-of-returns risk
+### Overview
+
+The **Near-Term Crash Probability** slider allows stress-testing plans against early market downturns, which are particularly dangerous due to sequence-of-returns risk.
+
+### Parameters
+
+| Parameter | Value | Rationale |
+|-----------|-------|-----------|
+| **Probability Range** | 0% to 60% | User-configurable stress test |
+| **Default** | 20% | Roughly matches historical frequency of 20%+ corrections |
+| **Crash Window** | First 3 years (36 months) | Early years are most vulnerable |
+| **Crash Magnitude** | ~25% equity drawdown | Typical major correction |
+| **Crash Duration** | 6-18 months | Variable, randomized within range |
+| **Affected Assets** | Equities only | Stocks bear brunt of crash |
+
+### Implementation
+
+For each simulation:
+```
+1. Determine if this simulation experiences crash:
+   hasCrash = random() < (crashProbability / 100)
+
+2. If hasCrash, randomize crash timing:
+   crashDuration = random(6 to 18 months)
+   crashStartMonth = random(1 to 36 - crashDuration)
+
+3. During crash months:
+   monthlyDrawdown = 0.25 / crashDuration
+
+   For each month in crash period:
+     equityWeight = % of portfolio in equities
+     monthlyReturn -= monthlyDrawdown × equityWeight
+```
+
+### Example
+
+User sets crash probability to 30%:
+- 300 out of 1,000 simulations will experience a crash
+- Each crash occurs randomly in months 1-36
+- Each crash lasts 6-18 months
+- Total equity drawdown: ~25%
+
+**Result**: Success rate reflects realistic early-crash scenarios, not just average returns.
+
+---
+
+## Strategy Comparison
+
+### Available Strategies
+
+The calculator compares 4-6 portfolio strategies:
+
+1. **Risk-Matched** 🎯
+   - Personalized to user's risk questionnaire
+   - Adjusts for age, job stability, guaranteed income
+
+2. **US-Focused** 🇺🇸
+   - 45% US Large Cap, 10% US Small Cap, 10% Intl
+   - Emphasizes domestic equities
+
+3. **Global Tilt** 🌍
+   - 30% US Large Cap, 25% Intl Developed, 10% Emerging
+   - Higher international diversification
+
+4. **Income-Focused** 💵
+   - 40% equities, 60% bonds/TIPS/high-yield
+   - Lower volatility, higher yield
+
+5. **Your Current** 📊 (optional)
+   - User's existing portfolio allocation
+   - Only shown if user enters current holdings
+
+6. **Build Your Own** ⚙️ (optional)
+   - Custom allocation from sliders
+   - Real-time interactive building
+
+### Strategy Comparison Methodology
+
+Each strategy runs 500 Monte Carlo simulations (reduced from 1,000 for performance) with identical parameters except allocation.
+
+**Key:** If user allocates to Primary Home, ALL strategies include that home allocation, funded realistically from cash/bonds first (except "Your Current" which uses exact user percentages).
+
+### Metrics Displayed
+
+For each strategy:
+```
+Success Rate: % of simulations where portfolio lasts AND income not cut
+Median Portfolio at Retirement: 50th percentile net worth at retirement age
+Expected Return: Weighted average of asset returns
+Volatility: Portfolio standard deviation
+```
 
 ---
 
@@ -638,15 +803,7 @@ Success Rate = (Number of successful simulations / Total simulations) × 100%
 
 ### Supplementary Metrics
 
-#### 1. Partial Success Rate
-```
-Partial Success = Portfolio survives to end age
-                  BUT income was reduced below target at some point
-
-Interpretation: "Portfolio lasted, but you had to tighten your belt"
-```
-
-#### 2. Funded Through Age (Conservative Estimate)
+#### 1. Funded Through Age (Conservative Estimate)
 ```
 Funded Through Age (Conservative) = 10th percentile age when portfolio depletes
 
@@ -655,14 +812,14 @@ Interpretation: "In 90% of scenarios, your portfolio lasts at least until age X"
 
 **Example**: If the 10th percentile depletion age is 91, you can be 90% confident your portfolio will last until at least age 91.
 
-#### 3. Funded Through Age (Median)
+#### 2. Funded Through Age (Median)
 ```
 Funded Through Age (Median) = 50th percentile age when portfolio depletes
 
 Interpretation: "In half of scenarios, your portfolio lasts past age X"
 ```
 
-#### 4. Portfolio Value Percentiles
+#### 3. Portfolio Value Percentiles
 
 At key milestones (retirement start, end age), the simulator reports:
 
@@ -673,29 +830,13 @@ Portfolio Percentiles:
   90th: Value below which only 10% of outcomes fall (optimistic)
 ```
 
-**Example at Retirement**:
-```
-10th percentile: $1.8M (bad luck with market timing)
-50th percentile: $2.5M (expected outcome)
-90th percentile: $3.4M (good luck with market timing)
-```
-
-**Example at End Age**:
-```
-10th percentile: $0 (depleted in tough scenarios)
-25th percentile: $500K
-50th percentile: $1.2M
-75th percentile: $2.8M
-90th percentile: $5.1M (large legacy in favorable scenarios)
-```
-
 ### Fan Chart Visualization
 
 The "trajectory by age" creates a **fan chart** showing:
 
 ```
 For each age from now to end age:
-  - 10th percentile portfolio value
+  - 10th percentile net worth (liquid + home)
   - 25th percentile
   - 50th percentile (median)
   - 75th percentile
@@ -724,91 +865,6 @@ This visualization shows:
 
 ---
 
-## Tax Optimization
-
-### Roth Conversion Optimizer
-
-The calculator includes a **Roth conversion optimizer** that finds opportunities to convert tax-deferred savings (Traditional IRA/401(k)) to Roth IRA at favorable tax rates.
-
-#### 2026 Tax Brackets
-
-**Married Filing Jointly**:
-```
-$0 - $23,850:        10%
-$23,850 - $96,950:   12%
-$96,950 - $206,700:  22% ← Target bracket for conversions
-$206,700 - $394,600: 24%
-$394,600 - $487,450: 32%
-$487,450+:           35% / 37%
-
-Standard Deduction: $32,200
-```
-
-**Single**:
-```
-$0 - $11,925:        10%
-$11,925 - $48,475:   12%
-$48,475 - $103,350:  22% ← Target bracket
-$103,350 - $197,300: 24%
-$197,300+:           32% / 35% / 37%
-
-Standard Deduction: $16,100
-```
-
-#### Conversion Strategy
-
-The optimizer aims to **"fill up" the 22% bracket** in low-income years (early retirement, before RMDs):
-
-```
-Available Room in 22% Bracket =
-  (Top of 22% bracket) - (Ordinary income) - (Standard deduction)
-
-Recommended Conversion = Available Room
-```
-
-**Example** (Married Filing Jointly):
-```
-Ordinary Income (interest, part-time work): $40,000
-Standard Deduction: $32,200
-Taxable Income before Conversion: $40,000 - $32,200 = $7,800
-
-Top of 22% Bracket: $206,700
-Room for Conversions: $206,700 - $7,800 = $198,900
-
-Recommendation: Convert $198,900 from Traditional IRA to Roth IRA
-Tax Cost: $198,900 × 22% = $43,758
-```
-
-**Benefit**: Dollars converted at 22% avoid potentially higher rates (24%, 32%) in later years when RMDs + Social Security push you into higher brackets.
-
-#### IRMAA Threshold Considerations
-
-For ages 63+, the optimizer also considers **IRMAA** (Income-Related Monthly Adjustment Amount) thresholds for Medicare Part B/D premiums:
-
-```
-2026 IRMAA Threshold:
-  Single: $109,000 MAGI
-  Married: $218,000 MAGI
-
-If income exceeds threshold → Medicare premiums increase
-```
-
-The optimizer **avoids conversions** that would trigger IRMAA in high-cost years.
-
-### Asset Location Recommendations
-
-The calculator suggests optimal "tax location" for assets:
-
-| Account Type | Best For | Reasoning |
-|--------------|----------|-----------|
-| **Tax-Deferred** (Traditional IRA/401k) | Bonds, REITs, High-Yield | Ordinary income; defer tax until withdrawal |
-| **Roth** (Roth IRA/401k) | Growth stocks, Equities | Tax-free growth; maximize value of tax-free compounding |
-| **Taxable** | Tax-efficient equities (index funds) | Qualified dividends, long-term cap gains (preferential rates) |
-
-**Rationale**: Place the highest-growth, highest-taxed assets in Roth to maximize tax-free compounding.
-
----
-
 ## Limitations and Disclaimers
 
 ### What This Calculator DOES NOT Model
@@ -824,7 +880,7 @@ The calculator suggests optimal "tax location" for assets:
    - Recommendation: Add 10-20% buffer to income goal for healthcare
 
 3. **One-Time Expenses**
-   - Home purchases, major repairs
+   - Major home repairs beyond annual maintenance
    - College funding for children/grandchildren
    - Large charitable gifts
    - Recommendation: Reduce "current savings" by anticipated expenses
@@ -834,17 +890,17 @@ The calculator suggests optimal "tax location" for assets:
    - "Retirement smile" (spending decreases with age) not captured
    - Part-time work in retirement not included
 
-5. **Real Estate**
-   - Home equity not included as an asset
-   - Rental income not modeled
-   - Downsizing proceeds not captured
+5. **Multiple Properties**
+   - Only primary home is modeled
+   - Rental income properties not supported
+   - Vacation homes not included
 
 6. **Estate Planning**
    - Inheritances (receiving or leaving)
    - Estate taxes on large portfolios
    - Gifting strategies
 
-7. **Correlations**
+7. **Detailed Correlations**
    - Simplified correlation model (70/30 common/idiosyncratic)
    - Does not fully capture crisis correlations (when all assets fall together)
 
@@ -902,59 +958,12 @@ To account for unmodeled risks:
 ### Black Swan Events
 
 This calculator **cannot predict**:
-- Major economic crises (2008-level events)
+- Major economic crises (2008-level events beyond the modeled crash scenario)
 - Policy changes (tax law, Social Security reform)
 - Personal shocks (health, divorce, job loss)
 - Technological disruption affecting markets
 
 **Recommendation**: Build flexibility into your plan (emergency fund, part-time work options, willingness to adjust spending).
-
----
-
-## Validation and Backtesting
-
-### Comparison to Industry Standards
-
-The methodologies used in this calculator align with:
-
-1. **Academic Research**:
-   - Bengen's 4% rule (1994)
-   - Guyton-Klinger guardrails research (2006)
-   - Trinity Study (1998) on safe withdrawal rates
-
-2. **Financial Planning Software**:
-   - Similar to MoneyGuidePro, eMoney, RightCapital
-   - Uses same Monte Carlo principles as Vanguard Nest Egg Calculator
-
-3. **Industry Best Practices**:
-   - CFP Board guidelines for retirement planning
-   - NAPFA (National Association of Personal Financial Advisors) standards
-
-### Historical Validation
-
-When backtested against historical data (1926-2025):
-
-- **4% rule**: 95% success rate over 30-year periods
-- **Guardrails strategy**: ~85-90% success rate with 10% higher income than fixed
-- **Glide path**: Reduces volatility by ~30% vs. static allocation in distribution phase
-
-**Note**: Past performance does not guarantee future results. Historical backtests assume reversion to mean, which may not occur if structural changes happen (e.g., permanently lower returns).
-
----
-
-## Conclusion
-
-This calculator uses sophisticated, transparent methods to model retirement under uncertainty. By combining:
-
-1. **Monte Carlo simulation** (capturing randomness)
-2. **Realistic market assumptions** (valuation-adjusted returns)
-3. **Risk-based allocation** (personalized to your tolerance)
-4. **Flexible withdrawal strategies** (adapting to market conditions)
-5. **Comprehensive metrics** (probabilistic success, not false certainty)
-
-...it provides a robust framework for retirement planning.
-
-**Remember**: This is a *model*, not a *crystal ball*. Use it as one input into your decision-making, alongside professional advice, personal circumstances, and ongoing monitoring.
 
 ---
 
@@ -965,6 +974,7 @@ This calculator uses sophisticated, transparent methods to model retirement unde
 Z ~ N(0,1)  [via Box-Muller transform]
 Return_equity = exp(μ - σ²/2 + σ×Z) - 1
 Return_bond = μ + σ×Z
+Return_home = normal distribution, correlated with inflation (0.6) and equities (0.2)
 Monthly μ = Annual μ / 12
 Monthly σ = Annual σ / √12
 ```
@@ -993,6 +1003,19 @@ Pre-retirement: Equity% decreases 1.5%/year (floor 20%)
 Post-retirement: Equity% decreases 3%/year (floor 30%)
 ```
 
+### Home Ownership
+```
+Net Monthly Benefit = Monthly Rent - (
+  Property Tax / 12 +
+  Insurance / 12 +
+  Maintenance / 12
+)
+
+Home Sale Proceeds = Home Value × 0.94  (6% selling costs)
+
+Ownership Costs Inflation = 3% annually
+```
+
 ### Success Rate
 ```
 Success Rate = (Sims where balance > 0 at end AND income never cut) / Total Sims
@@ -1000,7 +1023,7 @@ Success Rate = (Sims where balance > 0 at end AND income never cut) / Total Sims
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: January 2026
+**Document Version**: 2.0
+**Last Updated**: January 19, 2026
 **Methodology Current As Of**: January 19, 2026
 **Market Data Date**: January 2026

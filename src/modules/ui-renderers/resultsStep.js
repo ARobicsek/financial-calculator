@@ -2,7 +2,8 @@ import { state } from '../state.js';
 // import { renderInlineEditor, attachInlineEditorListeners } from './inlineEditor.js'; // Disabling inline editor in dashboard mode
 import { renderStrategyComparison, attachCustomCardListeners, customCardAllocation } from './strategyComparison.js';
 import { formatNumber, formatRiskProfile } from '../utils/formatting.js';
-import { showMethodology, toggleSidebar, setupAssumptionsSidebar } from './sidebar.js';
+import { toggleSidebar, setupAssumptionsSidebar } from './sidebar.js';
+import { showMethodsPage } from '../methodsPage.js';
 import { FUND_RECOMMENDATIONS } from '../../data/marketData.js';
 import { Chart } from 'chart.js';
 import { runMonteCarloSimulation } from '../../engine/monteCarlo.js';
@@ -100,7 +101,7 @@ export function updateResultsView(recalculateCallback) {
   // Attach methodology link listener
   document.getElementById('methodologyLink')?.addEventListener('click', (e) => {
     e.preventDefault();
-    showMethodology();
+    showMethodsPage();
   });
 
   // Attach assumptions sidebar button listener

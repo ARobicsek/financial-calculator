@@ -344,11 +344,10 @@ function runCustomCardSimulation() {
   // Check if this allocation includes home ownership
   const hasHome = (allocation.residentialRealEstate || 0) > 0;
 
-  // For Build Your Own, don't use complex housing params (rent/cost modeling)
-  // because the user's configured rent doesn't properly scale with custom home sizes.
-  // Instead, treat residential real estate as a simple appreciating asset class.
-  // The Rent vs Buy comparison is already disabled for Build Your Own.
-  const housingParams = null;
+  // Use real housing params if available, so that "Build Your Own" 
+  // correctly models ownership costs (taxes, maintenance) vs rent savings.
+  // This aligns the math with "Your Current" and prevents "free lunch" home returns.
+  const housingParams = state.results ? state.results.housingParams : null;
 
   // Run quick simulation (200 iterations)
   const result = runMonteCarloSimulation({
