@@ -1,0 +1,40 @@
+import { state } from '../state.js';
+
+export function renderAdvancedStep() {
+    return `
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Tax Filing Status</label>
+        <select class="form-select" id="filingStatus">
+          <option value="single" ${state.inputs.filingStatus === 'single' ? 'selected' : ''}>Single</option>
+          <option value="married" ${state.inputs.filingStatus === 'married' ? 'selected' : ''}>Married Filing Jointly</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Job Stability</label>
+        <select class="form-select" id="jobStability">
+          <option value="very_stable" ${state.inputs.jobStability === 'very_stable' ? 'selected' : ''}>Very Stable (government, tenured)</option>
+          <option value="stable" ${state.inputs.jobStability === 'stable' ? 'selected' : ''}>Stable (long-term employment)</option>
+          <option value="variable" ${state.inputs.jobStability === 'variable' ? 'selected' : ''}>Variable (private sector)</option>
+          <option value="highly_variable" ${state.inputs.jobStability === 'highly_variable' ? 'selected' : ''}>Highly Variable (commission, freelance)</option>
+        </select>
+        <span class="form-hint">Stable income acts like a bond - affects allocation</span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Withdrawal Strategy</label>
+        <select class="form-select" id="withdrawalStrategy">
+          <option value="guardrails" ${state.inputs.withdrawalStrategy === 'guardrails' ? 'selected' : ''}>Guardrails (4.5% initial, adaptive)</option>
+          <option value="fixed" ${state.inputs.withdrawalStrategy === 'fixed' ? 'selected' : ''}>Fixed (3.9% safe withdrawal rate)</option>
+        </select>
+        <span class="form-hint">Guardrails adjusts spending based on portfolio performance</span>
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="cursor: pointer;">
+          <input type="checkbox" id="useGlidePath" ${state.inputs.useGlidePath ? 'checked' : ''} style="margin-right: 8px;">
+          Use Glide Path (gradually reduce equities)
+        </label>
+        <span class="form-hint">Reduces equity allocation by ~1.5% per year approaching retirement</span>
+      </div>
+    </div>
+  `;
+}
