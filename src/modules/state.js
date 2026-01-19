@@ -17,8 +17,8 @@ export const state = {
     inputs: {
         // Basic Info
         age: 52,
-        currentSavings: 10400000,
-        windfall: 800000,
+        currentSavings: 11200000,
+        windfall: 0,
         monthlyContribution: 2000,
         // Goals
         retirementAge: 65,
@@ -49,12 +49,12 @@ export const state = {
         useCurrentAllocation: true,
         // Housing Configuration (for residential real estate allocation)
         housing: {
-            monthlyRent: 14000,           // Current rent payment
-            propertyTaxRate: 0.012,       // 1.2% of home value annually
-            annualInsurance: 8000,        // Home insurance
-            maintenanceRate: 0.01,        // 1% of home value annually
-            monthlyHOA: 500,              // HOA fees
-            expectedHoldingYears: 13      // Years before potential sale
+            monthlyRent: 14000,              // Current rent payment
+            propertyTaxRate: 0.012,          // 1.2% of home value annually
+            annualInsurance: 8000,           // Home insurance
+            maintenanceRate: 0.01,           // 1% of home value annually
+            annualMaintenance: 5000,         // Annual maintenance budget
+            expectedHoldingYears: 13         // Years before potential sale
         }
     },
     results: null,

@@ -299,11 +299,66 @@ Owning: monthlyExpenses = (desiredIncome - annualRent) / 12 + ownershipCosts / 1
 
 ---
 
-## Next Steps for Development
+## Implementation Status
 
-1. **Implement Phase 1** (basic toggle) to test user interest
-2. Gather user feedback on whether rent vs. buy comparison is valuable
-3. If positive, proceed to **Phase 3** (full Monte Carlo) for robust analysis
-4. Consider **Phase 4** only if users request advanced features
+### ✅ Completed (Phase 3 - Full Monte Carlo)
 
-**Estimated Total Effort:** 40-60 hours for full Phase 3 implementation
+The home purchase feature has been fully implemented with the following capabilities:
+
+1. **Unified Asset Class Model**
+   - Home treated as `residentialRealEstate` asset class in portfolio allocation
+   - User specifies home allocation as percentage of total portfolio (0-100%)
+   - All strategy cards (Risk-Matched, US-Focused, Global Tilt, etc.) include home allocation consistently
+
+2. **Flexible Holding Period**
+   - Slider control: 1-20 years or "Never" (keep home forever)
+   - Home automatically sold after holding period (unless "Never" selected)
+   - 6% selling costs deducted from proceeds
+
+3. **Comprehensive Cost Modeling**
+   - Property tax (% of home value)
+   - Annual insurance (fixed dollar amount)
+   - Maintenance rate (% of home value)
+   - Annual maintenance budget (fixed dollar amount)
+   - **All costs inflate at 3% annually** for realistic projections
+
+4. **Net Worth Tracking**
+   - Chart displays `netWorth = portfolio + homeValue` throughout entire timeline
+   - Smooth, continuous projections without "steps" when home is sold
+   - Home appreciation modeled with 3.5% expected return, 8% volatility
+
+5. **Rent vs Buy Comparison**
+   - Dynamic card that compares selected strategy with/without home purchase
+   - Side-by-side success rates and median portfolio values
+   - Uses pre-computed simulation results for consistency
+
+6. **Cash Flow Integration**
+   - **Before retirement**: Monthly contribution + rent savings - ownership costs
+   - **After retirement**: If home sold, rent expenses added back to withdrawals
+   - Rent inflates at 3% annually when user returns to renting post-sale
+
+### Key Technical Details
+
+**Files Modified:**
+- `src/engine/monteCarlo.js`: Core simulation engine with `buildTrajectoryByAge()` using netWorth
+- `src/modules/calculator.js`: Orchestrates housing params, applies to all strategies
+- `src/modules/ui-renderers/portfolioStep.js`: Housing configuration UI with slider
+- `src/modules/ui-renderers/resultsStep.js`: Rent vs Buy comparison card
+- `src/modules/dashboard.js`: Real-time slider updates and value mapping
+- `src/modules/state.js`: Housing configuration state management
+
+**Chart Fix (Jan 2026):**
+- Portfolio projection chart now correctly plots `netWorth` (portfolio + home value)
+- Eliminates artificial "step" when home is sold (proceeds just transfer between asset types)
+- Consistent rendering whether viewing initial results or after clicking strategy cards
+
+### Remaining Opportunities (Phase 4)
+
+Optional advanced features not yet implemented:
+- Downsizing modeling (selling at specific age, buying smaller home)
+- Reverse mortgage alerts
+- Multiple property scenarios
+- Geographic adjustment factors
+- Break-even year calculation display
+
+**Current Status:** Phase 3 complete. Feature is production-ready with full Monte Carlo integration.

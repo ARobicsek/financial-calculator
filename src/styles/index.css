@@ -532,6 +532,20 @@ body {
   margin-top: var(--spacing-xs);
 }
 
+.housing-inputs-grid .slider-labels {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  text-align: center;
+}
+
+.housing-inputs-grid .slider-labels span:first-child {
+  text-align: left;
+}
+
+.housing-inputs-grid .slider-labels span:last-child {
+  text-align: right;
+}
+
 /* ===========================================
    Portfolio Allocation Step
    =========================================== */
@@ -2136,6 +2150,55 @@ body {
 .housing-inputs-grid input:focus {
   outline: none;
   border-color: var(--color-accent);
+}
+
+/* Housing slider specific styles */
+.slider-value-label {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  margin-bottom: var(--spacing-sm);
+  text-align: center;
+}
+
+.housing-slider {
+  width: 100%;
+  height: 6px;
+  background: var(--color-bg-dark);
+  border-radius: 3px;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.housing-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: var(--color-accent);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+.housing-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.housing-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: var(--color-accent);
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+.housing-slider::-moz-range-thumb:hover {
+  transform: scale(1.2);
 }
 
 .housing-cost-breakdown {

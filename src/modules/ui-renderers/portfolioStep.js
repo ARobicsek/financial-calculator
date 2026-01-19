@@ -24,7 +24,7 @@ export function renderPortfolioStep() {
     (homeValue * housing.propertyTaxRate) +
     housing.annualInsurance +
     (homeValue * housing.maintenanceRate) +
-    (housing.monthlyHOA * 12) : 0;
+    (housing.annualMaintenance || 5000) : 0;
   const monthlyOwnershipCosts = annualOwnershipCosts / 12;
   const annualRent = housing.monthlyRent * 12;
   const monthlySavings = housing.monthlyRent - monthlyOwnershipCosts;
@@ -56,10 +56,10 @@ export function renderPortfolioStep() {
       <div class="housing-config-section">
         <h4>🏠 Home Purchase Configuration</h4>
         <p class="housing-summary">
-          Buying a <strong>$${(homeValue / 1000000).toFixed(2)}M</strong> home eliminates rent of 
-          <strong>$${housing.monthlyRent.toLocaleString()}/mo</strong>, saving 
+          Buying a <strong>$${(homeValue / 1000000).toFixed(2)}M</strong> home eliminates rent of
+          <strong>$${housing.monthlyRent.toLocaleString()}/mo</strong>, saving
           <strong class="${monthlySavings > 0 ? 'positive' : 'negative'}">$${Math.abs(monthlySavings).toLocaleString()}/mo</strong>
-          ${monthlySavings > 0 ? 'vs. ownership costs' : 'more than renting'}.
+          vs. renting costs.
         </p>
         
         <div class="housing-inputs-grid">
@@ -72,10 +72,13 @@ export function renderPortfolioStep() {
           </div>
           
           <div class="form-group">
-            <label>Expected Holding Period</label>
-            <div class="input-with-suffix">
-              <input type="number" id="expectedHoldingYears" value="${housing.expectedHoldingYears}" min="1" max="40" step="1">
-              <span class="suffix">years</span>
+            <label>When to sell and return to renting</label>
+            <div class="slider-value-label" id="holdingPeriodLabel">${housing.expectedHoldingYears === 999 ? 'Never' : housing.expectedHoldingYears + ' years'}</div>
+            <input type="range" id="expectedHoldingYears" value="${housing.expectedHoldingYears === 999 ? 21 : housing.expectedHoldingYears}" min="1" max="21" step="1" class="housing-slider">
+            <div class="slider-labels">
+              <span>1 year</span>
+              <span>20 years</span>
+              <span>Never</span>
             </div>
           </div>
           
@@ -104,10 +107,10 @@ export function renderPortfolioStep() {
           </div>
           
           <div class="form-group">
-            <label>Monthly HOA</label>
+            <label>Annual Maintenance</label>
             <div class="input-with-prefix">
               <span class="prefix">$</span>
-              <input type="number" id="monthlyHOA" value="${housing.monthlyHOA}" min="0" max="5000" step="100">
+              <input type="number" id="annualMaintenance" value="${housing.annualMaintenance || 5000}" min="0" max="50000" step="500">
             </div>
           </div>
         </div>
@@ -149,15 +152,29 @@ export function renderPortfolioStep() {
 // Initialize housing input event listeners
 export function initHousingInputListeners() {
   const housingInputs = ['monthlyRent', 'expectedHoldingYears', 'propertyTaxRate',
-    'annualInsurance', 'maintenanceRate', 'monthlyHOA'];
+    'annualInsurance', 'maintenanceRate', 'annualMaintenance'];
 
   housingInputs.forEach(inputId => {
     const input = document.getElementById(inputId);
     if (input) {
+      // For holding period slider, add real-time label update
+      if (inputId === 'expectedHoldingYears') {
+        input.addEventListener('input', (e) => {
+          const value = parseInt(e.target.value) || 13;
+          const label = document.getElementById('holdingPeriodLabel');
+          if (label) {
+            label.textContent = value === 999 ? 'Never' : value + ' years';
+          }
+        });
+      }
+
       input.addEventListener('change', (e) => {
         const value = parseFloat(e.target.value) || 0;
         if (inputId === 'propertyTaxRate' || inputId === 'maintenanceRate') {
           state.inputs.housing[inputId] = value / 100; // Convert from % to decimal
+        } else if (inputId === 'expectedHoldingYears') {
+          // Store 999 as a special value meaning "never sell"
+          state.inputs.housing[inputId] = parseInt(value);
         } else {
           state.inputs.housing[inputId] = value;
         }

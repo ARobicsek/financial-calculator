@@ -57,7 +57,7 @@ function scrapeDashboardInputs() {
         state.inputs.housing.propertyTaxRate = (parseFloat(document.getElementById('propertyTaxRate')?.value) || 1.2) / 100;
         state.inputs.housing.annualInsurance = parseFloat(document.getElementById('annualInsurance')?.value) || 0;
         state.inputs.housing.maintenanceRate = (parseFloat(document.getElementById('maintenanceRate')?.value) || 1) / 100;
-        state.inputs.housing.monthlyHOA = parseFloat(document.getElementById('monthlyHOA')?.value) || 0;
+        state.inputs.housing.annualMaintenance = parseFloat(document.getElementById('annualMaintenance')?.value) || 5000;
     }
 
     // Goals
@@ -110,7 +110,7 @@ function performCalculation() {
         (homePurchasePrice * state.inputs.housing.propertyTaxRate) +
         state.inputs.housing.annualInsurance +
         (homePurchasePrice * state.inputs.housing.maintenanceRate) +
-        (state.inputs.housing.monthlyHOA * 12) : 0;
+        (state.inputs.housing.annualMaintenance || 5000) : 0;
 
     const housingParams = homeAllocation > 0 ? {
         holdingPeriodYears: state.inputs.housing.expectedHoldingYears || 13,
@@ -208,9 +208,17 @@ function performCalculation() {
     }
 
     const strategyResults = allocationStrategies.map(strategy => {
-        // Only pass housingParams if this strategy has home allocation AND user has home params
-        const strategyHasHome = (strategy.allocation.residentialRealEstate || 0) > 0;
-        const strategyHousingParams = strategyHasHome ? housingParams : null;
+        // If user has allocated to housing, apply it to ALL strategies
+        // Add the housing allocation to each strategy's allocation
+        let strategyAllocation = { ...strategy.allocation };
+        if (homeAllocation > 0 && !strategy.isUserAllocation) {
+            // Only add housing to non-user allocations (user allocation already has it)
+            // Calculate the home allocation percentage as decimal
+            const homeAllocPct = homeAllocation / 100;
+
+            // Add residential real estate to the allocation
+            strategyAllocation.residentialRealEstate = homeAllocPct;
+        }
 
         const result = runMonteCarloSimulation({
             currentAge: state.inputs.age,
@@ -221,17 +229,18 @@ function performCalculation() {
             monthlyContribution: state.inputs.monthlyContribution,
             desiredIncome: state.inputs.desiredIncome,
             withdrawalStrategy: state.inputs.withdrawalStrategy,
-            allocation: strategy.allocation,
+            allocation: strategyAllocation,
             glidePathEnabled: state.inputs.useGlidePath,
-            housingParams: strategyHousingParams,
+            housingParams: housingParams,  // Pass housing params if user has home allocation
             iterations: 500
         });
 
         return {
             ...strategy,
+            allocation: strategyAllocation,  // Store the updated allocation with home
             successRate: result.successRate,
             medianPortfolio: result.portfolioAtRetirement.p50,
-            stats: calculatePortfolioStats(strategy.allocation)
+            stats: calculatePortfolioStats(strategyAllocation)
         };
     });
 

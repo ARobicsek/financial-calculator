@@ -18,7 +18,12 @@ export function updateResultsView(recalculateCallback) {
 
   // Get selected strategy or default to Risk-Matched
   const selectedStrategyName = state.selectedStrategy || 'Risk-Matched';
-  const selectedStrategy = strategyComparison?.find(s => s.name === selectedStrategyName) || riskMatchedStrategy;
+  const selectedStrategy = strategyComparison?.find(s => s.name === selectedStrategyName);
+
+  // Debug: log if strategy not found
+  if (!selectedStrategy) {
+    console.warn('Strategy not found:', selectedStrategyName, 'Available:', strategyComparison?.map(s => s.name));
+  }
 
   const successPercent = selectedStrategy
     ? (selectedStrategy.successRate * 100).toFixed(0)
@@ -151,6 +156,10 @@ export function selectStrategy(strategyName, customAllocation = null) {
   }
 
   // Run a fresh simulation to get trajectory data for the chart
+  // Include housing params if this allocation has home ownership
+  const hasHome = (allocation.residentialRealEstate || 0) > 0;
+  const housingParams = hasHome ? state.results.housingParams : null;
+
   const simResult = runMonteCarloSimulation({
     currentAge: state.inputs.age,
     retirementAge: state.inputs.retirementAge,
@@ -162,6 +171,7 @@ export function selectStrategy(strategyName, customAllocation = null) {
     withdrawalStrategy: state.inputs.withdrawalStrategy,
     allocation: allocation,
     glidePathEnabled: state.inputs.useGlidePath,
+    housingParams: housingParams,  // Include housing params!
     iterations: 500
   });
 
@@ -422,6 +432,14 @@ export function updateHousingComparison(strategyName, allocation) {
   // Check if this strategy has home allocation
   const hasHome = (allocation.residentialRealEstate || 0) > 0;
 
+  // Find the selected strategy from pre-computed results
+  const selectedStrategy = state.results.strategyComparison?.find(s => s.name === strategyName);
+
+  if (!selectedStrategy) {
+    console.warn('Strategy not found:', strategyName);
+    return;
+  }
+
   // Create allocation WITHOUT home (redistribute proportionally)
   const allocationWithoutHome = { ...allocation };
   if (hasHome) {
@@ -438,23 +456,15 @@ export function updateHousingComparison(strategyName, allocation) {
     }
   }
 
-  // Run simulation WITH home
-  const withHomeResult = runMonteCarloSimulation({
-    currentAge: state.inputs.age,
-    retirementAge: state.inputs.retirementAge,
-    endAge: state.inputs.endAge,
-    currentSavings: state.inputs.currentSavings,
-    windfall: state.inputs.windfall,
-    monthlyContribution: state.inputs.monthlyContribution,
-    desiredIncome: state.inputs.desiredIncome,
-    withdrawalStrategy: state.inputs.withdrawalStrategy,
-    allocation: allocation,
-    glidePathEnabled: state.inputs.useGlidePath,
-    housingParams: hasHome ? housingParams : null,
-    iterations: 300
-  });
+  // Use the pre-computed strategy result for WITH home (BUY scenario)
+  const withHomeResult = {
+    successRate: selectedStrategy.successRate,
+    portfolioAtRetirement: {
+      p50: selectedStrategy.medianPortfolio
+    }
+  };
 
-  // Run simulation WITHOUT home
+  // Run simulation WITHOUT home (RENT scenario) - only run this one
   const withoutHomeResult = runMonteCarloSimulation({
     currentAge: state.inputs.age,
     retirementAge: state.inputs.retirementAge,
@@ -467,7 +477,7 @@ export function updateHousingComparison(strategyName, allocation) {
     allocation: allocationWithoutHome,
     glidePathEnabled: state.inputs.useGlidePath,
     housingParams: null, // No home
-    iterations: 300
+    iterations: 500  // Match the strategy comparison iterations
   });
 
   const buySuccess = (withHomeResult.successRate * 100).toFixed(0);

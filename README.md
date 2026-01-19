@@ -21,7 +21,10 @@ A sophisticated retirement planning tool that uses Monte Carlo simulations to mo
 
 ## 🏠 Home Purchase Model details
 The calculator now consistently models home ownership:
-- **Purchase:** Part of portfolio is allocated to home.
-- **Holding Period:** User-specified (default 13 years).
-- **Sale:** Home sold after holding period (minus 6% costs), proceeds reinvested.
+- **Purchase:** Part of portfolio is allocated to home (user-specified percentage).
+- **Holding Period:** Configurable from 1-20 years or "Never" (keep home forever).
+- **Ownership Costs:** Property tax, insurance, maintenance (all inflating at 3% annually).
+- **Sale:** Home sold after holding period (minus 6% costs), proceeds reinvested into liquid portfolio.
+- **Net Worth Tracking:** Portfolio chart displays total net worth (liquid + home equity) for smooth projections without "steps" when home is sold.
 - **Comparison:** The "Rent vs Buy" card dynamically compares the *selected* strategy with and without the home purchase.
+- **Strategy Consistency:** All strategy cards (Risk-Matched, US-Focused, etc.) include the user's home allocation if specified.

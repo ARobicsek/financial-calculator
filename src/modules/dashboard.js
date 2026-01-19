@@ -220,15 +220,32 @@ function refreshPortfolioCard() {
 // Initialize housing configuration input listeners
 function initHousingInputListeners() {
   const housingInputs = ['monthlyRent', 'expectedHoldingYears', 'propertyTaxRate',
-    'annualInsurance', 'maintenanceRate', 'monthlyHOA'];
+    'annualInsurance', 'maintenanceRate', 'annualMaintenance'];
 
   housingInputs.forEach(inputId => {
     const input = document.getElementById(inputId);
     if (input) {
+      // For holding period slider, add real-time label update
+      if (inputId === 'expectedHoldingYears') {
+        input.addEventListener('input', (e) => {
+          const sliderValue = parseInt(e.target.value) || 13;
+          // Map slider position 21 to "Never" (999 years), otherwise use the value directly
+          const actualValue = sliderValue === 21 ? 999 : sliderValue;
+          const label = document.getElementById('holdingPeriodLabel');
+          if (label) {
+            label.textContent = actualValue === 999 ? 'Never' : actualValue + ' years';
+          }
+        });
+      }
+
       input.addEventListener('change', (e) => {
         const value = parseFloat(e.target.value) || 0;
         if (inputId === 'propertyTaxRate' || inputId === 'maintenanceRate') {
           state.inputs.housing[inputId] = value / 100;
+        } else if (inputId === 'expectedHoldingYears') {
+          // Map slider position 21 to "Never" (999 years)
+          const sliderValue = parseInt(value);
+          state.inputs.housing[inputId] = sliderValue === 21 ? 999 : sliderValue;
         } else {
           state.inputs.housing[inputId] = value;
         }

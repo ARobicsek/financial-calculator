@@ -129,7 +129,7 @@ function runSingleSimulation(params) {
     // Housing state
     const holdingPeriodMonths = hasHome ? (housingParams.holdingPeriodYears || 13) * 12 : 0;
     const monthlyRent = hasHome ? (housingParams.monthlyRent || 0) : 0;
-    const monthlyOwnershipCosts = hasHome ? (housingParams.monthlyOwnershipCosts || 0) : 0;
+    let currentMonthlyOwnershipCosts = hasHome ? (housingParams.monthlyOwnershipCosts || 0) : 0;
     let hasSoldHome = false;
     let currentMonthlyRent = 0; // Only applies after selling home
 
@@ -170,6 +170,13 @@ function runSingleSimulation(params) {
             }
         }
 
+        // Inflate ownership costs annually (if homeowner and haven't sold)
+        // Use conservative 3% annual inflation for all ownership costs
+        if (hasHome && !hasSoldHome && month % 12 === 0 && month > 0) {
+            const ownershipCostInflation = 0.03; // 3% annual inflation
+            currentMonthlyOwnershipCosts *= (1 + ownershipCostInflation);
+        }
+
         // Generate monthly return for liquid portfolio
         const monthlyReturn = generatePortfolioReturn(currentAllocation, expectedReturns, volatility);
         portfolio *= (1 + monthlyReturn);
@@ -184,7 +191,9 @@ function runSingleSimulation(params) {
             homeValue *= (1 + homeReturn);
 
             // Check if it's time to sell (after holding period)
-            if (month >= holdingPeriodMonths) {
+            // If holding period is 999+ years, never sell (keep home forever)
+            const neverSell = holdingPeriodMonths >= 999 * 12;
+            if (!neverSell && month >= holdingPeriodMonths) {
                 const sellingCosts = 0.06; // 6% selling costs
                 const netProceeds = homeValue * (1 - sellingCosts);
                 portfolio += netProceeds;
@@ -204,7 +213,7 @@ function runSingleSimulation(params) {
 
             // If homeowner, add rent savings minus ownership costs
             if (hasHome && !hasSoldHome) {
-                const netMonthlySavings = monthlyRent - monthlyOwnershipCosts;
+                const netMonthlySavings = monthlyRent - currentMonthlyOwnershipCosts;
                 portfolio += netMonthlySavings;
             }
         } else {
@@ -323,6 +332,27 @@ function percentile(arr, p) {
 }
 
 /**
+ * Build trajectory data by age using net worth (portfolio + home value)
+ * This ensures the fan chart shows total wealth, not just liquid portfolio
+ */
+function buildTrajectoryByAge(results, currentAge, endAge) {
+    const trajectoryByAge = {};
+    for (let age = currentAge; age <= endAge; age++) {
+        const netWorths = results
+            .map(r => r.trajectory.find(t => t.age === age)?.netWorth || 0);
+
+        trajectoryByAge[age] = {
+            p10: percentile(netWorths, 10),
+            p25: percentile(netWorths, 25),
+            p50: percentile(netWorths, 50),
+            p75: percentile(netWorths, 75),
+            p90: percentile(netWorths, 90)
+        };
+    }
+    return trajectoryByAge;
+}
+
+/**
  * Main Monte Carlo simulation runner
  * @param {Object} params - Simulation parameters
  * @param {number} iterations - Number of simulations (default 1000)
@@ -392,21 +422,8 @@ export function runMonteCarloSimulation(params, iterations = 1000) {
         return r.depletedAge || endAge;
     });
 
-    // Get percentile trajectories for fan chart
-    const trajectoryByAge = {};
-    for (let age = currentAge; age <= endAge; age++) {
-        const portfoliosAtAge = results
-            .map(r => r.trajectory.find(t => t.age === age)?.portfolio || 0)
-            .filter(p => p !== undefined);
-
-        trajectoryByAge[age] = {
-            p10: percentile(portfoliosAtAge, 10),
-            p25: percentile(portfoliosAtAge, 25),
-            p50: percentile(portfoliosAtAge, 50),
-            p75: percentile(portfoliosAtAge, 75),
-            p90: percentile(portfoliosAtAge, 90)
-        };
-    }
+    // Get percentile trajectories for fan chart (using netWorth to include home value)
+    const trajectoryByAge = buildTrajectoryByAge(results, currentAge, endAge);
 
     return {
         // Summary statistics
@@ -418,18 +435,18 @@ export function runMonteCarloSimulation(params, iterations = 1000) {
         fundedThroughAge: Math.round(percentile(fundedAges, 10)), // Conservative: 10th percentile
         medianFundedAge: Math.round(percentile(fundedAges, 50)),
 
-        // Portfolio projections at retirement
+        // Portfolio projections at retirement (including home value if still owned)
         portfolioAtRetirement: {
             p10: percentile(
-                results.map(r => r.trajectory.find(t => t.age === retirementAge)?.portfolio || 0),
+                results.map(r => r.trajectory.find(t => t.age === retirementAge)?.netWorth || 0),
                 10
             ),
             p50: percentile(
-                results.map(r => r.trajectory.find(t => t.age === retirementAge)?.portfolio || 0),
+                results.map(r => r.trajectory.find(t => t.age === retirementAge)?.netWorth || 0),
                 50
             ),
             p90: percentile(
-                results.map(r => r.trajectory.find(t => t.age === retirementAge)?.portfolio || 0),
+                results.map(r => r.trajectory.find(t => t.age === retirementAge)?.netWorth || 0),
                 90
             )
         },
@@ -575,6 +592,7 @@ function runSingleSimulationWithHome(params) {
     let minWithdrawalRatio = 1;
     let hasSoldHome = false;
     let monthlyRent = isRenter ? (params.originalMonthlyRent || 0) : 0;
+    let currentMonthlyOwnershipCosts = monthlyOwnershipCosts;
 
     const trajectory = [{
         age: currentAge,
@@ -614,6 +632,13 @@ function runSingleSimulationWithHome(params) {
             }
         }
 
+        // Inflate ownership costs annually (if homeowner and haven't sold)
+        // Use conservative 3% annual inflation for all ownership costs
+        if (!isRenter && !hasSoldHome && month % 12 === 0 && month > 0) {
+            const ownershipCostInflation = 0.03; // 3% annual inflation
+            currentMonthlyOwnershipCosts *= (1 + ownershipCostInflation);
+        }
+
         // Generate portfolio return
         const monthlyReturn = generatePortfolioReturn(currentAllocation, expectedReturns, volatility);
         portfolio *= (1 + monthlyReturn);
@@ -624,7 +649,9 @@ function runSingleSimulationWithHome(params) {
             homeValue *= (1 + homeReturn);
 
             // Check if it's time to sell (at holding period)
-            if (month === holdingPeriodMonths && month < totalMonths) {
+            // If holding period is 999+ years, never sell (keep home forever)
+            const neverSell = holdingPeriodYears >= 999;
+            if (!neverSell && month === holdingPeriodMonths && month < totalMonths) {
                 const sellingCosts = 0.06; // 6% selling costs
                 const netProceeds = homeValue * (1 - sellingCosts);
                 portfolio += netProceeds;
@@ -645,7 +672,7 @@ function runSingleSimulationWithHome(params) {
                 portfolio += monthlyContribution;
             } else if (!hasSoldHome) {
                 // Homeowner: contribution + rent savings - ownership costs
-                const netMonthlyBenefit = monthlyRentSavings - monthlyOwnershipCosts;
+                const netMonthlyBenefit = monthlyRentSavings - currentMonthlyOwnershipCosts;
                 portfolio += monthlyContribution + netMonthlyBenefit;
             } else {
                 // Sold home, back to renting: just standard contribution
@@ -752,7 +779,7 @@ export function runHousingComparisonSimulation(params, iterations = 500) {
         propertyTaxRate = 0.012,
         annualInsurance = 8000,
         maintenanceRate = 0.01,
-        monthlyHOA = 500,
+        annualMaintenance = 5000,
         expectedHoldingYears = 13
     } = params;
 
@@ -764,7 +791,7 @@ export function runHousingComparisonSimulation(params, iterations = 500) {
         (homePurchasePrice * propertyTaxRate) +
         annualInsurance +
         (homePurchasePrice * maintenanceRate) +
-        (monthlyHOA * 12);
+        annualMaintenance;
     const monthlyOwnershipCosts = annualOwnershipCosts / 12;
 
     // Adjust desired income for inflation to retirement
@@ -890,21 +917,3 @@ export function runHousingComparisonSimulation(params, iterations = 500) {
         }
     };
 }
-
-function buildTrajectoryByAge(results, currentAge, endAge) {
-    const trajectoryByAge = {};
-    for (let age = currentAge; age <= endAge; age++) {
-        const netWorths = results
-            .map(r => r.trajectory.find(t => t.age === age)?.netWorth || 0);
-
-        trajectoryByAge[age] = {
-            p10: percentile(netWorths, 10),
-            p25: percentile(netWorths, 25),
-            p50: percentile(netWorths, 50),
-            p75: percentile(netWorths, 75),
-            p90: percentile(netWorths, 90)
-        };
-    }
-    return trajectoryByAge;
-}
-
