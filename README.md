@@ -44,8 +44,9 @@ The app is hosted on **Netlify** with continuous deployment from GitHub.
 | **Live URL** | [https://not-relying-on-chance.netlify.app](https://not-relying-on-chance.netlify.app) |
 | **Repository** | [ARobicsek/financial-calculator](https://github.com/ARobicsek/financial-calculator) |
 | **Branch** | `main` |
-| **Build Command** | `npm run build` |
+| **Build Command** | `npm ci && npm run build` (via `netlify.toml`) |
 | **Publish Directory** | `dist` |
+| **Static Assets** | `public/` folder (copied to root of `dist/`) |
 
 **Auto-deploy:** Every `git push` to `main` triggers an automatic rebuild (~1 min).
 
