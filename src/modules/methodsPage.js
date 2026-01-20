@@ -12,10 +12,13 @@ function parseMarkdown(markdown) {
   let html = markdown;
 
   // Headers (order matters - do h4 before h3, h3 before h2, etc.)
-  html = html.replace(/^#### (.*$)/gim, '<h4>$1</h4>');
-  html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
-  html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
-  html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+  // Add IDs for navigation
+  const generateId = (text) => text.toLowerCase().replace(/[^\w]+/g, '-');
+
+  html = html.replace(/^#### (.*$)/gim, (match, p1) => `<h4 id="${generateId(p1)}">${p1}</h4>`);
+  html = html.replace(/^### (.*$)/gim, (match, p1) => `<h3 id="${generateId(p1)}">${p1}</h3>`);
+  html = html.replace(/^## (.*$)/gim, (match, p1) => `<h2 id="${generateId(p1)}">${p1}</h2>`);
+  html = html.replace(/^# (.*$)/gim, (match, p1) => `<h1 id="${generateId(p1)}">${p1}</h1>`);
 
   // Bold
   html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
@@ -68,6 +71,32 @@ async function loadMethodsContent() {
 }
 
 /**
+ * Handle smooth scrolling for internal links
+ */
+function setupInternalLinkNavigation(container) {
+  const links = container.querySelectorAll('a[href^="#"]');
+  links.forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      const targetId = link.getAttribute('href').substring(1);
+      const targetElement = document.getElementById(targetId);
+      if (targetElement) {
+        // Adjust scroll position for fixed header if needed, though methods page scrolls full window
+        // But if using window scroll, targetElement.scrollIntoView works well
+        const headerOffset = 80;
+        const elementPosition = targetElement.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: "smooth"
+        });
+      }
+    });
+  });
+}
+
+/**
  * Show the methods page
  */
 export async function showMethodsPage() {
@@ -88,6 +117,8 @@ export async function showMethodsPage() {
   const contentContainer = methodsPage.querySelector('.methods-content');
   if (contentContainer) {
     contentContainer.innerHTML = content;
+    // Setup internal navigation after content is injected
+    setupInternalLinkNavigation(contentContainer);
   }
 
   methodsPage.classList.remove('hidden');

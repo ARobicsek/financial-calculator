@@ -58,7 +58,8 @@ function scrapeDashboardInputs() {
         state.inputs.housing.propertyTaxRate = (parseFloat(document.getElementById('propertyTaxRate')?.value) || 1.2) / 100;
         state.inputs.housing.annualInsurance = parseFloat(document.getElementById('annualInsurance')?.value) || 0;
         state.inputs.housing.maintenanceRate = (parseFloat(document.getElementById('maintenanceRate')?.value) || 1) / 100;
-        state.inputs.housing.annualMaintenance = parseFloat(document.getElementById('annualMaintenance')?.value) || 5000;
+        // annualMaintenance removed from UI, defaulting to 0 as it's now fully covered by rate
+        state.inputs.housing.annualMaintenance = 0;
     }
 
     // Goals
@@ -112,7 +113,7 @@ async function performCalculation() {
         (homePurchasePrice * state.inputs.housing.propertyTaxRate) +
         state.inputs.housing.annualInsurance +
         (homePurchasePrice * state.inputs.housing.maintenanceRate) +
-        (state.inputs.housing.annualMaintenance || 5000) : 0;
+        (state.inputs.housing.annualMaintenance || 0) : 0;
 
     const housingParams = homeAllocation > 0 ? {
         holdingPeriodYears: state.inputs.housing.expectedHoldingYears || 13,

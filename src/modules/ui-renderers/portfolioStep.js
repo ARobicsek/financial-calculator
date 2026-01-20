@@ -24,7 +24,7 @@ export function renderPortfolioStep() {
     (homeValue * housing.propertyTaxRate) +
     housing.annualInsurance +
     (homeValue * housing.maintenanceRate) +
-    (housing.annualMaintenance || 5000) : 0;
+    (housing.annualMaintenance || 0) : 0;
   const monthlyOwnershipCosts = annualOwnershipCosts / 12;
   const annualRent = housing.monthlyRent * 12;
   const monthlySavings = housing.monthlyRent - monthlyOwnershipCosts;
@@ -105,14 +105,6 @@ export function renderPortfolioStep() {
               <span class="suffix">%</span>
             </div>
           </div>
-          
-          <div class="form-group">
-            <label>Annual Maintenance</label>
-            <div class="input-with-prefix">
-              <span class="prefix">$</span>
-              <input type="number" id="annualMaintenance" value="${housing.annualMaintenance || 5000}" min="0" max="50000" step="500">
-            </div>
-          </div>
         </div>
         
         <div class="housing-cost-breakdown">
@@ -152,7 +144,7 @@ export function renderPortfolioStep() {
 // Initialize housing input event listeners
 export function initHousingInputListeners() {
   const housingInputs = ['monthlyRent', 'expectedHoldingYears', 'propertyTaxRate',
-    'annualInsurance', 'maintenanceRate', 'annualMaintenance'];
+    'annualInsurance', 'maintenanceRate'];
 
   housingInputs.forEach(inputId => {
     const input = document.getElementById(inputId);
