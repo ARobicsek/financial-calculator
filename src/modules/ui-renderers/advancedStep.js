@@ -23,10 +23,10 @@ export function renderAdvancedStep() {
       <div class="form-group">
         <label class="form-label">Withdrawal Strategy</label>
         <select class="form-select" id="withdrawalStrategy">
-          <option value="guardrails" ${state.inputs.withdrawalStrategy === 'guardrails' ? 'selected' : ''}>Guardrails (4.5% initial, adaptive)</option>
-          <option value="fixed" ${state.inputs.withdrawalStrategy === 'fixed' ? 'selected' : ''}>Fixed (3.9% safe withdrawal rate)</option>
+          <option value="guardrails" ${state.inputs.withdrawalStrategy === 'guardrails' ? 'selected' : ''}>Guardrails (adaptive spending)</option>
+          <option value="fixed" ${state.inputs.withdrawalStrategy === 'fixed' ? 'selected' : ''}>Fixed (inflation-adjusted only)</option>
         </select>
-        <span class="form-hint">Guardrails adjusts spending based on portfolio performance</span>
+        <span class="form-hint">Guardrails adjusts spending based on portfolio performance; Fixed maintains constant real income</span>
       </div>
       <div class="form-group">
         <label class="form-label" style="cursor: pointer;">

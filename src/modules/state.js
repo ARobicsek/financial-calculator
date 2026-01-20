@@ -34,7 +34,7 @@ export const state = {
         filingStatus: 'married',
         jobStability: 'stable',
         useGlidePath: true,
-        withdrawalStrategy: 'guardrails',
+        withdrawalStrategy: 'fixed',
         nearTermCrashProbability: 20, // 0-60%, probability of 20%+ drawdown in next 3 years
         // Current Portfolio Allocation
         currentAllocation: {

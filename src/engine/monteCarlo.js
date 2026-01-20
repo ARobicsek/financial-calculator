@@ -138,6 +138,11 @@ function runSingleSimulation(params) {
     let currentWithdrawal = annualWithdrawal;
     let lastYearReturn = 0;
     let minWithdrawalRatio = 1;
+    let maxWithdrawalRatio = 1;
+    let annualReturnAccumulator = 0;
+    let guardrailsIncreaseCount = 0;
+    let guardrailsDecreaseCount = 0;
+    let guardrailsFreezeCount = 0;
 
     // Near-term crash injection logic
     // Decide if this simulation experiences an early crash based on user probability
@@ -206,6 +211,9 @@ function runSingleSimulation(params) {
 
         portfolio *= (1 + monthlyReturn);
 
+        // Accumulate monthly returns for annual return calculation
+        annualReturnAccumulator += monthlyReturn;
+
         // Handle home appreciation if still owned
         if (hasHome && !hasSoldHome && homeValue > 0) {
             const homeReturn = generateMonthlyReturn(
@@ -251,6 +259,7 @@ function runSingleSimulation(params) {
             }
 
             if (withdrawalStrategy === 'guardrails' && month % 12 === 0) {
+                const priorWithdrawal = currentWithdrawal;
                 currentWithdrawal = applyGuardrails(
                     portfolio,
                     currentWithdrawal,
@@ -258,6 +267,15 @@ function runSingleSimulation(params) {
                     lastYearReturn,
                     endAge - age
                 );
+
+                // Track what guardrails did
+                if (currentWithdrawal > priorWithdrawal * 1.05) {
+                    guardrailsIncreaseCount++;
+                } else if (currentWithdrawal < priorWithdrawal * 0.95) {
+                    guardrailsDecreaseCount++;
+                } else if (Math.abs(currentWithdrawal - priorWithdrawal) < priorWithdrawal * 0.01) {
+                    guardrailsFreezeCount++;
+                }
             } else if (withdrawalStrategy === 'fixed' && month % 12 === 0) {
                 currentWithdrawal *= (1 + inflationRate);
                 if (hasSoldHome) {
@@ -270,7 +288,10 @@ function runSingleSimulation(params) {
 
         // Track annual return for guardrails
         if (month % 12 === 0) {
-            lastYearReturn = monthlyReturn * 12;
+            // Use the sum of 12 monthly returns as the annual return
+            lastYearReturn = annualReturnAccumulator;
+            annualReturnAccumulator = 0; // Reset for next year
+
             if (isRetired && annualWithdrawal > 0) {
                 const withdrawalRatio = currentWithdrawal / annualWithdrawal;
                 minWithdrawalRatio = Math.min(minWithdrawalRatio, withdrawalRatio);
@@ -620,6 +641,7 @@ function runSingleSimulationWithHome(params) {
     let hasSoldHome = false;
     let monthlyRent = isRenter ? (params.originalMonthlyRent || 0) : 0;
     let currentMonthlyOwnershipCosts = monthlyOwnershipCosts;
+    let annualReturnAccumulator = 0;
 
     const trajectory = [{
         age: currentAge,
@@ -669,6 +691,9 @@ function runSingleSimulationWithHome(params) {
         // Generate portfolio return
         const monthlyReturn = generatePortfolioReturn(currentAllocation, expectedReturns, volatility);
         portfolio *= (1 + monthlyReturn);
+
+        // Accumulate monthly returns for annual return calculation
+        annualReturnAccumulator += monthlyReturn;
 
         // Handle home value if owner and hasn't sold
         if (!isRenter && !hasSoldHome && homeValue > 0) {
@@ -734,7 +759,10 @@ function runSingleSimulationWithHome(params) {
 
         // Track annual return for guardrails
         if (month % 12 === 0) {
-            lastYearReturn = monthlyReturn * 12;
+            // Use the sum of 12 monthly returns as the annual return
+            lastYearReturn = annualReturnAccumulator;
+            annualReturnAccumulator = 0; // Reset for next year
+
             if (isRetired && annualWithdrawal > 0) {
                 const withdrawalRatio = currentWithdrawal / annualWithdrawal;
                 minWithdrawalRatio = Math.min(minWithdrawalRatio, withdrawalRatio);
