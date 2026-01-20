@@ -255,10 +255,9 @@ function runSingleSimulation(params) {
             // Distribution phase: apply withdrawal strategy
             let monthlyWithdrawal = currentWithdrawal / 12;
 
-            // If sold home, need to add rent to expenses
-            if (hasSoldHome) {
-                monthlyWithdrawal += currentMonthlyRent;
-            }
+            // NOTE: We do NOT add rent after selling home. The desiredIncome already
+            // includes housing costs (consistent with "never bought" scenario where
+            // rent is implicitly part of living expenses).
 
             if (withdrawalStrategy === 'guardrails' && month % 12 === 0) {
                 const priorWithdrawal = currentWithdrawal;
@@ -280,9 +279,6 @@ function runSingleSimulation(params) {
                 }
             } else if (withdrawalStrategy === 'fixed' && month % 12 === 0) {
                 currentWithdrawal *= (1 + inflationRate);
-                if (hasSoldHome) {
-                    currentMonthlyRent *= (1 + inflationRate);
-                }
             }
 
             portfolio -= monthlyWithdrawal;
@@ -774,10 +770,8 @@ function runSingleSimulationWithHome(params) {
             // Distribution phase
             let monthlyWithdrawal = currentWithdrawal / 12;
 
-            // If sold home and now renting, need to add rent to expenses
-            if (hasSoldHome && !isRenter) {
-                monthlyWithdrawal += monthlyRent;
-            }
+            // NOTE: We do NOT add rent after selling home. The desiredIncome already
+            // includes housing costs (consistent with "never bought" scenario).
 
             if (withdrawalStrategy === 'guardrails' && month % 12 === 0) {
                 const priorWithdrawal = currentWithdrawal;
@@ -799,9 +793,6 @@ function runSingleSimulationWithHome(params) {
                 }
             } else if (withdrawalStrategy === 'fixed' && month % 12 === 0) {
                 currentWithdrawal *= (1 + inflationRate);
-                if (hasSoldHome) {
-                    monthlyRent *= (1 + inflationRate); // Rent inflates
-                }
             }
 
             portfolio -= monthlyWithdrawal;
