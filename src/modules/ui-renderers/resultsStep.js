@@ -36,24 +36,18 @@ export function updateResultsView(recalculateCallback) {
       <h2>Your Projections</h2>
     </div>
     
-    <div class="primary-result">
-      <div class="funded-age">
-        <div class="label">Your plan is funded through age</div>
-        <div class="age">${monte.fundedThroughAge}</div>
-        <div class="success-rate">
-          <span class="percent">${successPercent}%</span> probability of success
+    <div class="results-grid four-columns">
+      <div class="result-card success-card">
+        <h4>Success Rate</h4>
+        <div class="value success-rate">
+          <span class="percent ${successPercent >= 80 ? 'good' : successPercent >= 60 ? 'warning' : 'danger'}">${successPercent}%</span>
           ${successPercent >= 80 ? '✓' : '⚠️'}
         </div>
-        <div class="selected-strategy-label">
-          Using <strong>${selectedStrategyName}</strong> allocation
-        </div>
+        <div class="subtext selected-strategy-label">Using <strong>${selectedStrategyName}</strong></div>
       </div>
-    </div>
-    
-    <div class="results-grid three-columns">
       <div class="result-card">
         <h4>Portfolio at Retirement</h4>
-        <div class="value">$${formatNumber(selectedStrategy?.medianPortfolio || monte.portfolioAtRetirement.p50)}</div>
+        <div class="value">$${formatNumber(monte.trajectoryByAge[state.inputs.retirementAge]?.p50 || monte.portfolioAtRetirement.p50)}</div>
         <div class="subtext">Median projection at age ${state.inputs.retirementAge}</div>
       </div>
       <div class="result-card">
@@ -70,15 +64,20 @@ export function updateResultsView(recalculateCallback) {
     
     <div class="chart-container">
       <div class="chart-header">
-        <h3>Portfolio Projection</h3>
+        <h3>Portfolio Projection: <span class="chart-strategy-name" id="chartStrategyName">${selectedStrategyName}</span></h3>
         <div class="chart-legend">
           <div class="legend-item"><span class="legend-color" style="background: rgba(34, 197, 94, 0.3);"></span> 25-75th</div>
           <div class="legend-item"><span class="legend-color" style="background: rgba(212, 169, 66, 1);"></span> Median</div>
           <div class="legend-item"><span class="legend-color" style="background: rgba(239, 68, 68, 0.3);"></span> 10-90th</div>
         </div>
       </div>
-      <div class="chart-wrapper">
-        <canvas id="fanChart"></canvas>
+      <div class="chart-with-allocation">
+        <div class="chart-wrapper">
+          <canvas id="fanChart"></canvas>
+        </div>
+        <div class="chart-allocation-box" id="chartAllocationBox">
+          ${renderChartAllocationBox(selectedStrategy?.allocation || allocation.allocation)}
+        </div>
       </div>
     </div>
     
@@ -93,7 +92,16 @@ export function updateResultsView(recalculateCallback) {
   // Setup assumptions sidebar
   setupAssumptionsSidebar();
 
-  // Initialize Rent vs Buy comparison
+  // IMPORTANT: Re-select the strategy to ensure chart trajectory matches
+  // The initial monte.trajectoryByAge is from Risk-Matched, not the selected strategy
+  if (selectedStrategy) {
+    // Use setTimeout to allow DOM to finish rendering before running simulation
+    setTimeout(() => {
+      selectStrategy(selectedStrategyName, selectedStrategy.allocation);
+    }, 50);
+  }
+
+  // Initialize Rent vs Buy comparison (will be updated by selectStrategy above)
   if (selectedStrategy) {
     updateHousingComparison(selectedStrategyName, selectedStrategy.allocation);
   }
@@ -180,26 +188,53 @@ export function selectStrategy(strategyName, customAllocation = null) {
   const successPercent = (simResult.successRate * 100).toFixed(0);
   const stats = selectedStrategy?.stats || calculatePortfolioStats(allocation);
 
-  document.querySelector('.percent').textContent = successPercent + '%';
-  document.querySelector('.success-rate').innerHTML = `
-    <span class="percent">${successPercent}%</span> probability of success
-    ${successPercent >= 80 ? '✓' : '⚠️'}
-  `;
-  document.querySelector('.selected-strategy-label').innerHTML =
-    `Using <strong>${strategyName}</strong> allocation`;
-
-  // Update result cards
-  const resultCards = document.querySelectorAll('.result-card');
-  if (resultCards[0]) {
-    resultCards[0].querySelector('.value').textContent = '$' + formatNumber(simResult.portfolioAtRetirement.p50);
+  // Update success card (first card)
+  const successCard = document.querySelector('.success-card');
+  if (successCard) {
+    const percentSpan = successCard.querySelector('.percent');
+    if (percentSpan) {
+      percentSpan.textContent = successPercent + '%';
+      percentSpan.className = `percent ${successPercent >= 80 ? 'good' : successPercent >= 60 ? 'warning' : 'danger'}`;
+    }
+    const successRateDiv = successCard.querySelector('.success-rate');
+    if (successRateDiv) {
+      successRateDiv.innerHTML = `
+        <span class="percent ${successPercent >= 80 ? 'good' : successPercent >= 60 ? 'warning' : 'danger'}">${successPercent}%</span>
+        ${successPercent >= 80 ? '✓' : '⚠️'}
+      `;
+    }
+    const strategyLabel = successCard.querySelector('.selected-strategy-label');
+    if (strategyLabel) {
+      strategyLabel.innerHTML = `Using <strong>${strategyName}</strong>`;
+    }
   }
-  if (resultCards[2]) {
-    resultCards[2].querySelector('.value').textContent = stats.expectedReturnFormatted;
-    resultCards[2].querySelector('.subtext').textContent = 'Volatility: ' + stats.volatilityFormatted;
+
+  // Update result cards - use trajectory data for consistency with chart labels
+  const resultCards = document.querySelectorAll('.result-card');
+  // Card 0 = Success Rate, Card 1 = Portfolio at Retirement, Card 2 = Withdrawal, Card 3 = Expected Return
+  if (resultCards[1]) {
+    const retirementMedian = simResult.trajectoryByAge[state.inputs.retirementAge]?.p50 || simResult.portfolioAtRetirement.p50;
+    resultCards[1].querySelector('.value').textContent = '$' + formatNumber(retirementMedian);
+  }
+  if (resultCards[3]) {
+    resultCards[3].querySelector('.value').textContent = stats.expectedReturnFormatted;
+    resultCards[3].querySelector('.subtext').textContent = 'Volatility: ' + stats.volatilityFormatted;
   }
 
   // Update Rent vs Buy comparison
   updateHousingComparison(strategyName, allocation);
+
+  // Update chart title with strategy name
+  const chartStrategyName = document.getElementById('chartStrategyName');
+  if (chartStrategyName) {
+    chartStrategyName.textContent = strategyName;
+  }
+
+  // Update allocation box
+  const allocationBox = document.getElementById('chartAllocationBox');
+  if (allocationBox) {
+    allocationBox.innerHTML = renderChartAllocationBox(allocation);
+  }
 
   // Update visual selection on cards
   document.querySelectorAll('.strategy-card').forEach(card => {
@@ -215,6 +250,70 @@ export function selectStrategy(strategyName, customAllocation = null) {
   renderFanChartWithData(simResult.trajectoryByAge);
 }
 
+// Render allocation breakdown box for the chart
+function renderChartAllocationBox(allocation) {
+  if (!allocation) return '<div class="allocation-box-empty">No allocation data</div>';
+
+  const assetLabels = {
+    usLargeCap: 'US Large Cap',
+    usSmallCap: 'US Small/Mid',
+    intlDeveloped: 'Intl Developed',
+    emergingMarkets: 'Emerging Mkts',
+    usAggregateBonds: 'US Bonds',
+    tips: 'TIPS',
+    cashMoneyMarket: 'Cash',
+    residentialRealEstate: 'Home'
+  };
+
+  // Order matches the strategy card layout
+  const assetOrder = [
+    'usLargeCap',
+    'usSmallCap',
+    'intlDeveloped',
+    'emergingMarkets',
+    'usAggregateBonds',
+    'tips',
+    'cashMoneyMarket',
+    'residentialRealEstate'
+  ];
+
+  const assetColors = {
+    usLargeCap: '#4f8cff',
+    usSmallCap: '#6ba3ff',
+    intlDeveloped: '#5ecf8f',
+    emergingMarkets: '#3db070',
+    usAggregateBonds: '#f9a846',
+    tips: '#f5c86e',
+    cashMoneyMarket: '#9ca3af',
+    residentialRealEstate: '#d4a942'
+  };
+
+  // Build list of allocations with non-zero values, in specified order
+  const items = assetOrder
+    .map(key => {
+      const pct = (allocation[key] || 0) * 100;
+      return { key, label: assetLabels[key], pct, color: assetColors[key] };
+    })
+    .filter(item => item.pct > 0);
+
+  if (items.length === 0) {
+    return '<div class="allocation-box-empty">No allocations</div>';
+  }
+
+  return `
+    <div class="allocation-box-title">Allocation</div>
+    <div class="allocation-box-items">
+      ${items.map(item => `
+        <div class="allocation-box-item">
+          <span class="allocation-box-color" style="background: ${item.color};"></span>
+          <span class="allocation-box-label">${item.label}</span>
+          <span class="allocation-box-pct">${item.pct.toFixed(0)}%</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
 function renderFanChart() {
   const { trajectoryByAge } = state.results.monte;
   renderFanChartWithData(trajectoryByAge);
@@ -222,10 +321,24 @@ function renderFanChart() {
 
 function renderFanChartWithData(trajectoryByAge) {
   const ages = Object.keys(trajectoryByAge).map(Number);
+  const retirementAge = state.inputs.retirementAge;
+  const endAge = ages[ages.length - 1];
+
+  // Find indices for retirement and end age
+  const retirementIndex = ages.indexOf(retirementAge);
+  const endIndex = ages.length - 1;
 
   const ctx = document.getElementById('fanChart').getContext('2d');
 
   if (state.fanChart) state.fanChart.destroy();
+
+  // Helper to create point radius array with specific points highlighted
+  const createPointRadius = (highlightIndices) => {
+    return ages.map((_, i) => highlightIndices.includes(i) ? 4 : 0);
+  };
+
+  // Indices to highlight (retirement and end)
+  const highlightPoints = [retirementIndex, endIndex].filter(i => i >= 0);
 
   state.fanChart = new Chart(ctx, {
     type: 'line',
@@ -235,10 +348,12 @@ function renderFanChartWithData(trajectoryByAge) {
         {
           label: '10th Percentile',
           data: ages.map(age => trajectoryByAge[age].p10),
-          borderColor: 'transparent',
+          borderColor: 'rgba(239, 68, 68, 0.5)',
           backgroundColor: 'transparent',
+          borderWidth: 1,
           fill: false,
-          pointRadius: 0
+          pointRadius: createPointRadius(highlightPoints),
+          pointBackgroundColor: 'rgba(239, 68, 68, 0.8)'
         },
         {
           label: '25th Percentile',
@@ -259,10 +374,12 @@ function renderFanChartWithData(trajectoryByAge) {
         {
           label: '90th Percentile',
           data: ages.map(age => trajectoryByAge[age].p90),
-          borderColor: 'transparent',
+          borderColor: 'rgba(239, 68, 68, 0.5)',
           backgroundColor: 'rgba(239, 68, 68, 0.15)',
+          borderWidth: 1,
           fill: '-1',
-          pointRadius: 0
+          pointRadius: createPointRadius(highlightPoints),
+          pointBackgroundColor: 'rgba(239, 68, 68, 0.8)'
         },
         {
           label: 'Median (50th)',
@@ -270,7 +387,8 @@ function renderFanChartWithData(trajectoryByAge) {
           borderColor: '#d4a942',
           backgroundColor: 'transparent',
           borderWidth: 3,
-          pointRadius: 0,
+          pointRadius: createPointRadius(highlightPoints),
+          pointBackgroundColor: '#d4a942',
           fill: false
         }
       ]
@@ -299,7 +417,43 @@ function renderFanChartWithData(trajectoryByAge) {
           grid: { color: 'rgba(255,255,255,0.05)' }
         }
       }
-    }
+    },
+    plugins: [{
+      id: 'dataLabels',
+      afterDatasetsDraw: (chart) => {
+        const ctx = chart.ctx;
+        const datasets = chart.data.datasets;
+
+        // Only label specific datasets: 10th (index 0), 90th (index 3), Median (index 4)
+        const datasetsToLabel = [
+          { index: 0, name: '10th', color: 'rgba(239, 68, 68, 1)', yOffset: 14 },
+          { index: 3, name: '90th', color: 'rgba(239, 68, 68, 1)', yOffset: -10 },
+          { index: 4, name: 'Median', color: '#d4a942', yOffset: -10 }
+        ];
+
+        highlightPoints.forEach(pointIndex => {
+          datasetsToLabel.forEach(({ index: datasetIndex, name, color, yOffset }) => {
+            const meta = chart.getDatasetMeta(datasetIndex);
+            if (!meta.hidden && meta.data[pointIndex]) {
+              const point = meta.data[pointIndex];
+              const value = datasets[datasetIndex].data[pointIndex];
+              const label = '$' + formatNumber(value);
+
+              ctx.save();
+              ctx.font = 'bold 10px sans-serif';
+              ctx.fillStyle = color;
+              ctx.textAlign = pointIndex === endIndex ? 'right' : 'center';
+
+              // Adjust position for end age labels (push slightly left)
+              const xOffset = pointIndex === endIndex ? -5 : 0;
+
+              ctx.fillText(label, point.x + xOffset, point.y + yOffset);
+              ctx.restore();
+            }
+          });
+        });
+      }
+    }]
   });
 }
 

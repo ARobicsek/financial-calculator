@@ -220,7 +220,7 @@ async function performCalculation() {
     if (state.inputs.useCurrentAllocation) {
         const userAlloc = state.inputs.currentAllocation;
         allocationStrategies.push({
-            name: 'Your Current',
+            name: 'Current',
             description: 'Your existing portfolio mix',
             allocation: {
                 usLargeCap: userAlloc.usLargeCap / 100,

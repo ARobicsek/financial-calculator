@@ -896,10 +896,41 @@ body {
   grid-template-columns: repeat(3, 1fr);
 }
 
+.results-grid.four-columns {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 1024px) {
+  .results-grid.four-columns {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 @media (max-width: 768px) {
-  .results-grid.three-columns {
+
+  .results-grid.three-columns,
+  .results-grid.four-columns {
     grid-template-columns: 1fr;
   }
+}
+
+/* Success card styling */
+.result-card.success-card .value {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.result-card.success-card .percent.good {
+  color: var(--color-success);
+}
+
+.result-card.success-card .percent.warning {
+  color: var(--color-warning);
+}
+
+.result-card.success-card .percent.danger {
+  color: var(--color-danger);
 }
 
 .selected-strategy-label {
@@ -995,6 +1026,110 @@ body {
 .chart-wrapper {
   position: relative;
   height: 350px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Strategy name in chart title */
+.chart-strategy-name {
+  color: var(--color-accent);
+  font-weight: 500;
+}
+
+/* Chart with allocation layout */
+.chart-with-allocation {
+  display: flex;
+  gap: var(--spacing-lg);
+  align-items: stretch;
+}
+
+/* Allocation box next to chart */
+.chart-allocation-box {
+  width: 180px;
+  flex-shrink: 0;
+  background: var(--color-bg-dark);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-allocation-box .allocation-box-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin-bottom: var(--spacing-sm);
+  font-weight: 600;
+}
+
+.chart-allocation-box .allocation-box-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.chart-allocation-box .allocation-box-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: 0.8125rem;
+}
+
+.chart-allocation-box .allocation-box-color {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.chart-allocation-box .allocation-box-label {
+  color: var(--color-text-secondary);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chart-allocation-box .allocation-box-pct {
+  color: var(--color-text-primary);
+  font-weight: 600;
+  min-width: 36px;
+  text-align: right;
+}
+
+.allocation-box-empty {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  font-style: italic;
+  padding: var(--spacing-sm);
+}
+
+@media (max-width: 768px) {
+  .chart-with-allocation {
+    flex-direction: column;
+  }
+
+  .chart-allocation-box {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+  }
+
+  .chart-allocation-box .allocation-box-title {
+    width: 100%;
+  }
+
+  .chart-allocation-box .allocation-box-items {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+  }
+
+  .chart-allocation-box .allocation-box-item {
+    width: auto;
+  }
 }
 
 /* ===========================================
@@ -2317,12 +2452,14 @@ body {
    =========================================== */
 .methods-page {
   position: fixed;
-  top: 80px; /* Below header */
+  top: 80px;
+  /* Below header */
   left: 0;
   right: 0;
   bottom: 0;
   background: var(--color-bg-dark);
-  z-index: 100; /* Below header but above main content */
+  z-index: 100;
+  /* Below header but above main content */
   overflow-y: auto;
   animation: fadeIn 0.3s ease;
 }
@@ -2335,7 +2472,8 @@ body {
   max-width: 900px;
   margin: 0 auto;
   padding: var(--spacing-3xl) var(--spacing-xl);
-  padding-top: var(--spacing-xl); /* Space at top of content */
+  padding-top: var(--spacing-xl);
+  /* Space at top of content */
 }
 
 /* Methods markdown styling */

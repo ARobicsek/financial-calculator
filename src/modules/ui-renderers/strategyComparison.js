@@ -346,7 +346,7 @@ function runCustomCardSimulation() {
 
   // Use real housing params if available, so that "Build Your Own" 
   // correctly models ownership costs (taxes, maintenance) vs rent savings.
-  // This aligns the math with "Your Current" and prevents "free lunch" home returns.
+  // This aligns the math with "Current" and prevents "free lunch" home returns.
   const housingParams = state.results ? state.results.housingParams : null;
 
   // Run quick simulation (200 iterations)
