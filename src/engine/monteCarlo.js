@@ -143,6 +143,8 @@ function runSingleSimulation(params) {
     let guardrailsIncreaseCount = 0;
     let guardrailsDecreaseCount = 0;
     let guardrailsFreezeCount = 0;
+    let yearsIntoRetirement = 0;
+    const initialRetirementWithdrawal = annualWithdrawal;
 
     // Near-term crash injection logic
     // Decide if this simulation experiences an early crash based on user probability
@@ -293,8 +295,12 @@ function runSingleSimulation(params) {
             annualReturnAccumulator = 0; // Reset for next year
 
             if (isRetired && annualWithdrawal > 0) {
-                const withdrawalRatio = currentWithdrawal / annualWithdrawal;
+                // Calculate what the withdrawal SHOULD be with normal inflation
+                const expectedWithdrawal = initialRetirementWithdrawal * Math.pow(1 + inflationRate, yearsIntoRetirement);
+                const withdrawalRatio = currentWithdrawal / expectedWithdrawal;
                 minWithdrawalRatio = Math.min(minWithdrawalRatio, withdrawalRatio);
+                maxWithdrawalRatio = Math.max(maxWithdrawalRatio, withdrawalRatio);
+                yearsIntoRetirement++;
             }
         }
 
@@ -336,6 +342,10 @@ function runSingleSimulation(params) {
         depleted: portfolio <= 0,
         incomeCut,
         minWithdrawalRatio,
+        maxWithdrawalRatio,
+        guardrailsIncreaseCount,
+        guardrailsDecreaseCount,
+        guardrailsFreezeCount,
         depletedAge: portfolio <= 0 ? trajectory.find(t => t.portfolio === 0)?.age : null,
         hasSoldHome
     };
@@ -464,6 +474,13 @@ export function runMonteCarloSimulation(params, iterations = 1000) {
     // Also track partial success (portfolio survived but income was cut)
     const partialSuccessCount = results.filter(r => !r.depleted && r.incomeCut).length;
 
+    // Guardrails debugging stats
+    const avgGuardrailsIncreases = results.reduce((sum, r) => sum + (r.guardrailsIncreaseCount || 0), 0) / iterations;
+    const avgGuardrailsDecreases = results.reduce((sum, r) => sum + (r.guardrailsDecreaseCount || 0), 0) / iterations;
+    const avgGuardrailsFreezes = results.reduce((sum, r) => sum + (r.guardrailsFreezeCount || 0), 0) / iterations;
+    const minWithdrawalRatios = results.map(r => r.minWithdrawalRatio);
+    const maxWithdrawalRatios = results.map(r => r.maxWithdrawalRatio);
+
     // Calculate "funded through" age
     const fundedAges = results.map(r => {
         if (!r.depleted) return endAge;
@@ -514,6 +531,23 @@ export function runMonteCarloSimulation(params, iterations = 1000) {
         // Withdrawal info
         initialWithdrawal: plannedWithdrawal,
         withdrawalRate: plannedWithdrawal / projectedAtRetirement,
+
+        // Debugging: withdrawal ratio statistics
+        withdrawalRatioStats: {
+            minWithdrawalRatio: {
+                p10: percentile(minWithdrawalRatios, 10),
+                p50: percentile(minWithdrawalRatios, 50),
+                p90: percentile(minWithdrawalRatios, 90)
+            },
+            maxWithdrawalRatio: {
+                p10: percentile(maxWithdrawalRatios, 10),
+                p50: percentile(maxWithdrawalRatios, 50),
+                p90: percentile(maxWithdrawalRatios, 90)
+            },
+            avgGuardrailsIncreases,
+            avgGuardrailsDecreases,
+            avgGuardrailsFreezes
+        },
 
         // Inputs echoed back
         inputs: {
@@ -641,7 +675,13 @@ function runSingleSimulationWithHome(params) {
     let hasSoldHome = false;
     let monthlyRent = isRenter ? (params.originalMonthlyRent || 0) : 0;
     let currentMonthlyOwnershipCosts = monthlyOwnershipCosts;
+    let maxWithdrawalRatio = 1;
     let annualReturnAccumulator = 0;
+    let guardrailsIncreaseCount = 0;
+    let guardrailsDecreaseCount = 0;
+    let guardrailsFreezeCount = 0;
+    let yearsIntoRetirement = 0;
+    const initialRetirementWithdrawal = annualWithdrawal;
 
     const trajectory = [{
         age: currentAge,
@@ -740,6 +780,7 @@ function runSingleSimulationWithHome(params) {
             }
 
             if (withdrawalStrategy === 'guardrails' && month % 12 === 0) {
+                const priorWithdrawal = currentWithdrawal;
                 currentWithdrawal = applyGuardrails(
                     portfolio,
                     currentWithdrawal,
@@ -747,6 +788,15 @@ function runSingleSimulationWithHome(params) {
                     lastYearReturn,
                     endAge - age
                 );
+
+                // Track what guardrails did
+                if (currentWithdrawal > priorWithdrawal * 1.05) {
+                    guardrailsIncreaseCount++;
+                } else if (currentWithdrawal < priorWithdrawal * 0.95) {
+                    guardrailsDecreaseCount++;
+                } else if (Math.abs(currentWithdrawal - priorWithdrawal) < priorWithdrawal * 0.01) {
+                    guardrailsFreezeCount++;
+                }
             } else if (withdrawalStrategy === 'fixed' && month % 12 === 0) {
                 currentWithdrawal *= (1 + inflationRate);
                 if (hasSoldHome) {
@@ -764,8 +814,12 @@ function runSingleSimulationWithHome(params) {
             annualReturnAccumulator = 0; // Reset for next year
 
             if (isRetired && annualWithdrawal > 0) {
-                const withdrawalRatio = currentWithdrawal / annualWithdrawal;
+                // Calculate what the withdrawal SHOULD be with normal inflation
+                const expectedWithdrawal = initialRetirementWithdrawal * Math.pow(1 + inflationRate, yearsIntoRetirement);
+                const withdrawalRatio = currentWithdrawal / expectedWithdrawal;
                 minWithdrawalRatio = Math.min(minWithdrawalRatio, withdrawalRatio);
+                maxWithdrawalRatio = Math.max(maxWithdrawalRatio, withdrawalRatio);
+                yearsIntoRetirement++;
             }
         }
 
@@ -807,6 +861,10 @@ function runSingleSimulationWithHome(params) {
         depleted: portfolio <= 0,
         incomeCut,
         minWithdrawalRatio,
+        maxWithdrawalRatio,
+        guardrailsIncreaseCount,
+        guardrailsDecreaseCount,
+        guardrailsFreezeCount,
         depletedAge: portfolio <= 0 ? trajectory.find(t => t.portfolio === 0)?.age : null,
         hasSoldHome
     };

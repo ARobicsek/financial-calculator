@@ -140,6 +140,30 @@ async function performCalculation() {
         nearTermCrashProbability: state.inputs.nearTermCrashProbability
     });
 
+    // Debug logging for withdrawal strategy analysis
+    if (mcResults.withdrawalRatioStats) {
+        console.log(`\n=== WITHDRAWAL STRATEGY DEBUG (${state.inputs.withdrawalStrategy.toUpperCase()}) ===`);
+        console.log(`Success Rate: ${(mcResults.successRate * 100).toFixed(1)}%`);
+        console.log(`Success Count: ${mcResults.successCount} / ${mcResults.totalSimulations}`);
+
+        // Calculate failure breakdown (need to get depleted count from results)
+        const totalFailed = mcResults.totalSimulations - mcResults.successCount;
+        console.log(`\nTotal Failed: ${totalFailed} (${(totalFailed / mcResults.totalSimulations * 100).toFixed(1)}%)`);
+
+        console.log(`\nWithdrawal Ratio Stats:`);
+        console.log(`  Min Ratio (median): ${mcResults.withdrawalRatioStats.minWithdrawalRatio.p50.toFixed(3)}`);
+        console.log(`  Min Ratio (p10): ${mcResults.withdrawalRatioStats.minWithdrawalRatio.p10.toFixed(3)}`);
+        console.log(`  Max Ratio (median): ${mcResults.withdrawalRatioStats.maxWithdrawalRatio.p50.toFixed(3)}`);
+        console.log(`  Max Ratio (p90): ${mcResults.withdrawalRatioStats.maxWithdrawalRatio.p90.toFixed(3)}`);
+        if (state.inputs.withdrawalStrategy === 'guardrails') {
+            console.log(`\nGuardrails Actions (avg per simulation):`);
+            console.log(`  Increases: ${mcResults.withdrawalRatioStats.avgGuardrailsIncreases.toFixed(1)}`);
+            console.log(`  Decreases: ${mcResults.withdrawalRatioStats.avgGuardrailsDecreases.toFixed(1)}`);
+            console.log(`  Freezes: ${mcResults.withdrawalRatioStats.avgGuardrailsFreezes.toFixed(1)}`);
+        }
+        console.log(`====================================\n`);
+    }
+
     // Define allocation strategies
     const allocationStrategies = [
         {
